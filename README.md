@@ -228,7 +228,7 @@ El archivo `.env` debe permanecer fuera del control de versiones.
 
 ## 🗺️ Roadmap
 
-* [ ] Inicializar proyecto Fastify + TypeScript.
+* [X] Inicializar proyecto Fastify + TypeScript.
 * [ ] Definir dominio y casos de uso.
 * [ ] Diseñar modelo de datos.
 * [ ] Configurar PostgreSQL.
