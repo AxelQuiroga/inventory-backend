@@ -4,38 +4,50 @@ import { UpdateProduct } from '../../application/products/update-product';
 import { DeleteProduct } from '../../application/products/delete-product';
 import { GetProduct } from '../../application/products/get-product';
 import { ListProducts } from '../../application/products/list-products';
-import type { CreateProductInput, UpdateProductInput, ProductQueryInput } from '../schemas/product-schema';
+import { createProductSchema, updateProductSchema, productQuerySchema } from '../schemas/product-schema';
 
 export class ProductController {
   constructor(
-    private createProduct: CreateProduct,
-    private updateProduct: UpdateProduct,
-    private deleteProduct: DeleteProduct,
-    private getProduct: GetProduct,
-    private listProducts: ListProducts,
+    private createProductUseCase: CreateProduct,
+    private updateProductUseCase: UpdateProduct,
+    private deleteProductUseCase: DeleteProduct,
+    private getProductUseCase: GetProduct,
+    private listProductsUseCase: ListProducts,
   ) {}
 
-  async create(request: FastifyRequest<{ Body: CreateProductInput }>, reply: FastifyReply) {
+  async create(request: FastifyRequest, reply: FastifyReply) {
+    const parsed = createProductSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ message: 'Invalid data', errors: parsed.error.flatten() });
+    }
+
     try {
-      const product = await this.createProduct.execute(request.body);
+      const product = await this.createProductUseCase.execute(parsed.data);
       return reply.status(201).send(product);
     } catch (error) {
       return this.handleError(error, reply);
     }
   }
 
-  async getAll(request: FastifyRequest<{ Querystring: ProductQueryInput }>, reply: FastifyReply) {
+  async getAll(request: FastifyRequest, reply: FastifyReply) {
+    const parsed = productQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ message: 'Invalid query', errors: parsed.error.flatten() });
+    }
+
     try {
-      const products = await this.listProducts.execute(request.query);
+      const products = await this.listProductsUseCase.execute(parsed.data);
       return reply.send(products);
     } catch (error) {
       return this.handleError(error, reply);
     }
   }
 
-  async getById(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+  async getById(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params as { id: string };
+
     try {
-      const product = await this.getProduct.execute(request.params.id);
+      const product = await this.getProductUseCase.execute(id);
       if (!product) {
         return reply.status(404).send({ message: 'Product not found' });
       }
@@ -45,9 +57,15 @@ export class ProductController {
     }
   }
 
-  async update(request: FastifyRequest<{ Params: { id: string }; Body: UpdateProductInput }>, reply: FastifyReply) {
+  async update(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params as { id: string };
+    const parsed = updateProductSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ message: 'Invalid data', errors: parsed.error.flatten() });
+    }
+
     try {
-      const product = await this.updateProduct.execute(request.params.id, request.body);
+      const product = await this.updateProductUseCase.execute(id, parsed.data);
       if (!product) {
         return reply.status(404).send({ message: 'Product not found' });
       }
@@ -57,9 +75,11 @@ export class ProductController {
     }
   }
 
-  async delete(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+  async delete(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params as { id: string };
+
     try {
-      const deleted = await this.deleteProduct.execute(request.params.id);
+      const deleted = await this.deleteProductUseCase.execute(id);
       if (!deleted) {
         return reply.status(404).send({ message: 'Product not found' });
       }

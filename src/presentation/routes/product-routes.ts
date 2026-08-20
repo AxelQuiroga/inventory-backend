@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { ProductController } from '../controllers/product-controller';
-import { createProductSchema, updateProductSchema, productQuerySchema } from '../schemas/product-schema';
 import { DrizzleProductRepository } from '../../infrastructure/repositories/product-repository';
 import { CreateProduct } from '../../application/products/create-product';
 import { UpdateProduct } from '../../application/products/update-product';
@@ -24,19 +23,9 @@ export async function productRoutes(app: FastifyInstance) {
     listProducts,
   );
 
-  app.post('/products', {
-    schema: { body: createProductSchema },
-  }, controller.create.bind(controller));
-
-  app.get('/products', {
-    schema: { querystring: productQuerySchema },
-  }, controller.getAll.bind(controller));
-
+  app.post('/products', controller.create.bind(controller));
+  app.get('/products', controller.getAll.bind(controller));
   app.get('/products/:id', controller.getById.bind(controller));
-
-  app.put('/products/:id', {
-    schema: { body: updateProductSchema },
-  }, controller.update.bind(controller));
-
+  app.put('/products/:id', controller.update.bind(controller));
   app.delete('/products/:id', controller.delete.bind(controller));
 }

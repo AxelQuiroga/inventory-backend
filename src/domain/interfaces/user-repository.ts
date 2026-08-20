@@ -1,0 +1,8 @@
+import type { User } from '../entities/user';
+
+export interface UserRepository {
+  create(data: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User>;
+  findById(id: string): Promise<User | null>;
+  findByEmail(email: string): Promise<User | null>;
+  findAll(): Promise<User[]>;
+}
