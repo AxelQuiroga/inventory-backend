@@ -1,4 +1,4 @@
-import jwt from '@fastify/jwt';
+import jwt from 'jsonwebtoken';
 
 export interface TokenPayload {
   userId: string;
