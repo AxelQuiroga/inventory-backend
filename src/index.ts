@@ -1,8 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import dotenv from 'dotenv';
-import { db } from './infrastructure/database';
-import { products } from './infrastructure/database/schema';
+import { productRoutes } from './presentation/routes/product-routes';
 
 dotenv.config();
 
@@ -12,11 +11,7 @@ const app = Fastify({
 
 app.register(cors);
 
-// Ruta de prueba - obtener productos
-app.get('/products', async () => {
-    const allProducts = await db.select().from(products);
-    return allProducts;
-});
+app.register(productRoutes);
 
 app.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
