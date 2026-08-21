@@ -4,6 +4,7 @@ import { DrizzleMovementRepository } from '../../infrastructure/repositories/mov
 import { RegisterStockEntry } from '../../application/movements/register-entry';
 import { RegisterStockExit } from '../../application/movements/register-exit';
 import { GetMovementHistory } from '../../application/movements/get-history';
+import { authenticate } from '../middleware/authenticate';
 
 export async function movementRoutes(app: FastifyInstance) {
   const repository = new DrizzleMovementRepository();
@@ -12,6 +13,8 @@ export async function movementRoutes(app: FastifyInstance) {
   const getHistory = new GetMovementHistory(repository);
 
   const controller = new MovementController(registerEntry, registerExit, getHistory);
+
+  app.addHook('preHandler', authenticate);
 
   app.post('/movements/entry', controller.createEntry.bind(controller));
   app.post('/movements/exit', controller.createExit.bind(controller));
