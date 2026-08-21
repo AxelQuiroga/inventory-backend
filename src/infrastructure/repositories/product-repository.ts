@@ -93,6 +93,28 @@ export class DrizzleProductRepository implements ProductRepository {
     return !!deleted;
   }
 
+  async updateStock(id: string, quantity: number): Promise<Product | null> {
+    const [updated] = await db
+      .update(products)
+      .set({
+        stock: sql`${products.stock} + ${quantity}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(products.id, id))
+      .returning();
+
+    return updated ? this.toDomain(updated) : null;
+  }
+
+  async findByIdRaw(id: string) {
+    const [found] = await db
+      .select()
+      .from(products)
+      .where(eq(products.id, id));
+
+    return found ?? null;
+  }
+
   // --- Métodos privados ---
 
   private toDomain(row: typeof products.$inferSelect): Product {
@@ -159,4 +181,5 @@ export class DrizzleProductRepository implements ProductRepository {
     const offset = (page - 1) * limit;
     return { offset, limit };
   }
+  
 }

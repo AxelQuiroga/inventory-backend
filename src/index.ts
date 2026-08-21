@@ -4,6 +4,7 @@ import jwt from '@fastify/jwt';
 import dotenv from 'dotenv';
 import { productRoutes } from './presentation/routes/product-routes';
 import { authRoutes } from './presentation/routes/auth-routes';
+import { movementRoutes } from './presentation/routes/movement-routes';
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ app.register(cors);
 app.register(jwt, { secret: process.env.JWT_SECRET! });
 
 app.register(authRoutes);
+app.register(movementRoutes);
 app.register(productRoutes);
 
 app.get('/health', async () => {
