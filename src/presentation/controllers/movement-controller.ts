@@ -18,13 +18,11 @@ export class MovementController {
     }
 
     try {
-      const user = request.user as { userId: string } | undefined;
-      const userId = user?.userId ?? '00000000-0000-0000-0000-000000000000';
-
-      const movement = await this.registerEntryUseCase.execute({
-        ...parsed.data,
-        userId,
-      });
+      const user = request.user as { userId: string };
+const movement = await this.registerEntryUseCase.execute({
+  ...parsed.data,
+  userId: user.userId,
+});
       return reply.status(201).send(movement);
     } catch (error) {
       if (error instanceof Error && error.message === 'Product not found') {
@@ -41,13 +39,11 @@ export class MovementController {
     }
 
     try {
-      const user = request.user as { userId: string } | undefined;
-      const userId = user?.userId ?? '00000000-0000-0000-0000-000000000000';
-
-      const movement = await this.registerExitUseCase.execute({
-        ...parsed.data,
-        userId,
-      });
+      const user = request.user as { userId: string };
+const movement = await this.registerEntryUseCase.execute({
+  ...parsed.data,
+  userId: user.userId,
+});
       return reply.status(201).send(movement);
     } catch (error) {
       if (error instanceof Error) {

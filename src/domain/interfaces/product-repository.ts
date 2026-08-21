@@ -17,6 +17,6 @@ export interface ProductRepository {
     findById(id: string): Promise<Product | null>;
     findBySku(sku: string): Promise<Product | null>;
     findAll(filters?: ProductFilters): Promise<Product[]>;
-    update(id: string, data: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Product | null>;
+    update(id: string, data: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'stock'>>): Promise<Product | null>;
     delete(id: string): Promise<boolean>;
 }

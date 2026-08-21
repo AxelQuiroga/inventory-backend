@@ -70,7 +70,6 @@ export class DrizzleProductRepository implements ProductRepository {
     if (data.category !== undefined) updateData.category = data.category;
     if (data.unit !== undefined) updateData.unit = data.unit;
     if (data.price !== undefined) updateData.price = String(data.price);
-    if (data.stock !== undefined) updateData.stock = data.stock;
     if (data.minStock !== undefined) updateData.minStock = data.minStock;
 
     updateData.updatedAt = new Date();
@@ -91,28 +90,6 @@ export class DrizzleProductRepository implements ProductRepository {
       .returning();
 
     return !!deleted;
-  }
-
-  async updateStock(id: string, quantity: number): Promise<Product | null> {
-    const [updated] = await db
-      .update(products)
-      .set({
-        stock: sql`${products.stock} + ${quantity}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(products.id, id))
-      .returning();
-
-    return updated ? this.toDomain(updated) : null;
-  }
-
-  async findByIdRaw(id: string) {
-    const [found] = await db
-      .select()
-      .from(products)
-      .where(eq(products.id, id));
-
-    return found ?? null;
   }
 
   // --- Métodos privados ---

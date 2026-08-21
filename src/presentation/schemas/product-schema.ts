@@ -18,7 +18,7 @@ export const updateProductSchema = z.object({
   category: z.string().min(1).optional(),
   unit: z.string().min(1).optional(),
   price: z.number().positive().optional(),
-  stock: z.number().int().min(0).optional(),
+  //stock: z.number().int().min(0).optional(),
   minStock: z.number().int().min(0).optional(),
 });
 
