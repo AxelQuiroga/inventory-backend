@@ -6,6 +6,7 @@ import { UpdateProduct } from '../../application/products/update-product';
 import { DeleteProduct } from '../../application/products/delete-product';
 import { GetProduct } from '../../application/products/get-product';
 import { ListProducts } from '../../application/products/list-products';
+import { authenticate } from '../middleware/authenticate';
 
 export async function productRoutes(app: FastifyInstance) {
   const repository = new DrizzleProductRepository();
@@ -22,6 +23,8 @@ export async function productRoutes(app: FastifyInstance) {
     getProduct,
     listProducts,
   );
+
+  app.addHook('preHandler', authenticate);
 
   app.post('/products', controller.create.bind(controller));
   app.get('/products', controller.getAll.bind(controller));
