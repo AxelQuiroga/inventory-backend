@@ -30,7 +30,7 @@ Una regla fundamental del sistema es que **el stock no se modifica directamente*
 * Docker
 * Docker Compose
 
-> El ORM y las herramientas adicionales de persistencia se definirán durante el desarrollo del proyecto.
+> ORM: Drizzle.
 
 ## 🏗️ Arquitectura
 
@@ -75,7 +75,7 @@ La lógica de negocio no debería depender directamente de Fastify ni de Postgre
 * Consultar productos.
 * Buscar y filtrar productos.
 * Actualizar información de productos.
-* Desactivar productos.
+* **Nota:** la "desactivación lógica" (soft-delete) está pendiente de decisión — hoy `DELETE /products/:id` elimina físicamente; la Regla 7 del diseño prefiere desactivación lógica.
 * Consultar productos con stock bajo.
 
 ### Inventario
@@ -106,28 +106,26 @@ Entre las principales reglas del dominio:
 9. Las operaciones críticas deben ejecutarse de forma atómica.
 10. Las acciones disponibles dependen del rol del usuario.
 
-## 📁 Estructura prevista
+## 📁 Estructura
 
 ```text
 src/
-├── config/
-├── controllers/
 ├── domain/
+│   ├── entities/        # Product, User, Movement + enums
+│   └── interfaces/      # Contratos de repositorios (sin Drizzle)
+├── application/         # Casos de uso (lógica de negocio)
 ├── infrastructure/
-│   ├── database/
-│   └── repositories/
-├── middlewares/
-├── routes/
-├── schemas/
-├── services/
-├── use-cases/
-├── app.ts
-└── server.ts
+│   ├── database/        # Drizzle, conexión, schema, seed
+│   ├── repositories/    # Implementaciones (únicos que importan Drizzle)
+│   └── auth/            # JwtService
+├── presentation/
+│   ├── schemas/         # Schemas Zod
+│   ├── controllers/     # Validación con safeParse
+│   ├── routes/          # DI + registro de rutas
+│   └── middleware/      # authenticate, authorize
+└── index.ts
 
-tests/
-├── unit/
-├── integration/
-└── e2e/
+Tests (Vitest): co-located junto al código — `src/**/*.test.ts`
 ```
 
 La estructura podrá evolucionar durante el desarrollo a medida que aparezcan nuevas necesidades.
@@ -191,23 +189,13 @@ E2E
 
 ## 🐳 Docker
 
-El proyecto está preparado para ejecutarse mediante Docker.
+**Pendiente** — todavía no hay `Dockerfile` ni `docker-compose.yml` en el repositorio.
 
-Construir los servicios:
+Cuando se implemente, el flujo previsto será:
 
 ```bash
 docker compose build
-```
-
-Levantar el entorno:
-
-```bash
 docker compose up
-```
-
-Detener los servicios:
-
-```bash
 docker compose down
 ```
 
@@ -234,16 +222,18 @@ El archivo `.env` debe permanecer fuera del control de versiones.
 * [X] Configurar PostgreSQL.
 * [X] Implementar persistencia.
 * [X] Implementar productos.
-* [ ] Implementar movimientos de inventario.
-* [ ] Implementar autenticación.
-* [ ] Implementar autorización.
+* [X] Implementar movimientos de inventario.
+* [X] Implementar autenticación.
+* [~] Implementar autorización — base lista (`authenticate` + `authorize`), falta definir la matriz de permisos por rol en cada ruta.
 * [X] Agregar validaciones.
 * [X] Agregar manejo de errores.
-* [ ] Implementar tests.
+* [X] Implementar tests (unit — capa application).
+* [ ] Tests de integración (PostgreSQL real — las reglas críticas del stock).
 * [ ] Dockerizar aplicación.
 * [ ] Configurar CI/CD.
 * [ ] Deploy de producción.
 * [ ] Documentar API.
+* [ ] Frontend (React).
 
 ## 📌 Estado
 
