@@ -31,6 +31,10 @@ export class DrizzleMovementRepository implements MovementRepository {
         })
         .returning();
 
+      if (!movement) {
+        throw new Error('Failed to create movement');
+      }
+
       // 3. Sumar stock
       await tx
         .update(products)
@@ -72,6 +76,10 @@ export class DrizzleMovementRepository implements MovementRepository {
           reason: data.reason,
         })
         .returning();
+
+      if (!movement) {
+        throw new Error('Failed to create movement');
+      }
 
       // 4. Restar stock
       await tx

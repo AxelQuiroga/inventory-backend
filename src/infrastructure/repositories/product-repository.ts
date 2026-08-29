@@ -21,6 +21,10 @@ export class DrizzleProductRepository implements ProductRepository {
       })
       .returning();
 
+    if (!created) {
+      throw new Error('Failed to create product');
+    }
+
     return this.toDomain(created);
   }
 

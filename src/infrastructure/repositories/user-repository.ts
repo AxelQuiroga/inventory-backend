@@ -17,6 +17,10 @@ export class DrizzleUserRepository implements UserRepository {
       })
       .returning();
 
+    if (!created) {
+      throw new Error('Failed to create user');
+    }
+
     return this.toDomain(created);
   }
 

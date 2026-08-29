@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import type { UserRepository } from '../../domain/interfaces/user-repository';
-import type { User } from '../../domain/entities/user';
+import { UserRole, type User } from '../../domain/entities/user';
 
 export class Register {
   constructor(private userRepository: UserRepository) {}
@@ -22,7 +22,7 @@ export class Register {
       email: data.email,
       password: hashedPassword,
       name: data.name,
-      role: data.role ?? 'VIEWER',
+      role: data.role ?? UserRole.VIEWER,
     });
 
     const { password: _, ...userWithoutPassword } = user;
