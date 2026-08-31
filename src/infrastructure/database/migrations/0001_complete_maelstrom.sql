@@ -1,0 +1,2 @@
+ALTER TABLE "products" ADD COLUMN "active" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "movements" ADD CONSTRAINT "movement_type_check" CHECK ("movements"."type" IN ('IN', 'OUT'));

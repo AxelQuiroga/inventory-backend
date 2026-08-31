@@ -1,16 +1,18 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { CreateProduct } from '../../application/products/create-product';
 import { UpdateProduct } from '../../application/products/update-product';
-import { DeleteProduct } from '../../application/products/delete-product';
+import { DeactivateProduct } from '../../application/products/deactivate-product';
+import { ReactivateProduct } from '../../application/products/reactivate-product';
 import { GetProduct } from '../../application/products/get-product';
 import { ListProducts } from '../../application/products/list-products';
-import { createProductSchema, updateProductSchema, productQuerySchema } from '../schemas/product-schema';
+import { createProductSchema, updateProductSchema, productQuerySchema, productParamsSchema } from '../schemas/product-schema';
 
 export class ProductController {
   constructor(
     private createProductUseCase: CreateProduct,
     private updateProductUseCase: UpdateProduct,
-    private deleteProductUseCase: DeleteProduct,
+    private deactivateProductUseCase: DeactivateProduct,
+    private reactivateProductUseCase: ReactivateProduct,
     private getProductUseCase: GetProduct,
     private listProductsUseCase: ListProducts,
   ) {}
@@ -35,6 +37,14 @@ export class ProductController {
       return reply.status(400).send({ message: 'Invalid query', errors: parsed.error.flatten() });
     }
 
+    // includeInactive es un mecanismo reservado a ADMIN
+    if (parsed.data.includeInactive) {
+      const user = request.user as { role?: string } | undefined;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ message: 'Forbidden' });
+      }
+    }
+
     try {
       const products = await this.listProductsUseCase.execute(parsed.data);
       return reply.send(products);
@@ -44,7 +54,11 @@ export class ProductController {
   }
 
   async getById(request: FastifyRequest, reply: FastifyReply) {
-    const { id } = request.params as { id: string };
+    const params = productParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.status(400).send({ message: 'Invalid params', errors: params.error.flatten() });
+    }
+    const { id } = params.data;
 
     try {
       const product = await this.getProductUseCase.execute(id);
@@ -58,7 +72,11 @@ export class ProductController {
   }
 
   async update(request: FastifyRequest, reply: FastifyReply) {
-    const { id } = request.params as { id: string };
+    const params = productParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.status(400).send({ message: 'Invalid params', errors: params.error.flatten() });
+    }
+    const { id } = params.data;
     const parsed = updateProductSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ message: 'Invalid data', errors: parsed.error.flatten() });
@@ -75,15 +93,37 @@ export class ProductController {
     }
   }
 
-  async delete(request: FastifyRequest, reply: FastifyReply) {
-    const { id } = request.params as { id: string };
+  async deactivate(request: FastifyRequest, reply: FastifyReply) {
+    const params = productParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.status(400).send({ message: 'Invalid params', errors: params.error.flatten() });
+    }
+    const { id } = params.data;
 
     try {
-      const deleted = await this.deleteProductUseCase.execute(id);
-      if (!deleted) {
+      const product = await this.deactivateProductUseCase.execute(id);
+      if (!product) {
         return reply.status(404).send({ message: 'Product not found' });
       }
-      return reply.status(204).send();
+      return reply.send(product);
+    } catch (error) {
+      return this.handleError(error, reply);
+    }
+  }
+
+  async reactivate(request: FastifyRequest, reply: FastifyReply) {
+    const params = productParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.status(400).send({ message: 'Invalid params', errors: params.error.flatten() });
+    }
+    const { id } = params.data;
+
+    try {
+      const product = await this.reactivateProductUseCase.execute(id);
+      if (!product) {
+        return reply.status(404).send({ message: 'Product not found' });
+      }
+      return reply.send(product);
     } catch (error) {
       return this.handleError(error, reply);
     }

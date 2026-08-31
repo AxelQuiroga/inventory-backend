@@ -11,8 +11,9 @@ const product: Product = {
   category: 'Electrónica',
   unit: 'unit',
   price: 899.99,
-  stock: 10,
+  stock: 0,
   minStock: 5,
+  active: true,
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
 };
@@ -23,7 +24,7 @@ const repository: ProductRepository = {
   findBySku: vi.fn(),
   findAll: vi.fn(),
   update: vi.fn(),
-  delete: vi.fn(),
+  setActive: vi.fn(),
 };
 
 const useCase = new CreateProduct(repository);
@@ -33,7 +34,7 @@ beforeEach(() => {
 });
 
 describe('CreateProduct', () => {
-  it('crea el producto cuando el SKU no existe', async () => {
+  it('crea el producto sin stock inicial cuando el SKU no existe', async () => {
     vi.mocked(repository.findBySku).mockResolvedValue(null);
     vi.mocked(repository.create).mockResolvedValue(product);
 
@@ -44,11 +45,11 @@ describe('CreateProduct', () => {
       category: 'Electrónica',
       unit: 'unit',
       price: 899.99,
-      stock: 10,
       minStock: 5,
     });
 
     expect(repository.findBySku).toHaveBeenCalledWith('LAP-001');
+    // El stock NO forma parte de la creación: la DB lo inicializa en 0
     expect(repository.create).toHaveBeenCalledWith({
       name: 'Laptop',
       description: 'Laptop 14"',
@@ -56,7 +57,6 @@ describe('CreateProduct', () => {
       category: 'Electrónica',
       unit: 'unit',
       price: 899.99,
-      stock: 10,
       minStock: 5,
     });
     expect(result).toEqual(product);
@@ -73,7 +73,6 @@ describe('CreateProduct', () => {
         category: 'Electrónica',
         unit: 'unit',
         price: 899.99,
-        stock: 10,
         minStock: 5,
       }),
     ).rejects.toThrow('SKU already exists');

@@ -6,8 +6,9 @@ export interface Product {
   category: string;
   unit: string;
   price: number;
-  stock: number; 
+  stock: number;
   minStock: number;
+  active: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

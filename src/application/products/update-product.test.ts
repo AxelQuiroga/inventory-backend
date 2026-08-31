@@ -13,6 +13,7 @@ const product: Product = {
   price: 899.99,
   stock: 10,
   minStock: 5,
+  active: true,
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
 };
@@ -23,7 +24,7 @@ const repository: ProductRepository = {
   findBySku: vi.fn(),
   findAll: vi.fn(),
   update: vi.fn(),
-  delete: vi.fn(),
+  setActive: vi.fn(),
 };
 
 const useCase = new UpdateProduct(repository);

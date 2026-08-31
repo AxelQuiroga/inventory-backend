@@ -6,17 +6,20 @@ export interface ProductFilters {
   minPrice?: number;      // Precio mínimo
   maxPrice?: number;      // Precio máximo
   lowStock?: boolean;     // Stock <= minStock
+  includeInactive?: boolean; // Solo ADMIN: incluye productos desactivados
   sortBy?: 'name' | 'price' | 'stock' | 'createdAt';
   order?: 'asc' | 'desc';
   page?: number;
   limit?: number;
 }
 
+export type ProductCreateData = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'stock' | 'active'>;
+
 export interface ProductRepository {
-    create(data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product>;
+    create(data: ProductCreateData): Promise<Product>;
     findById(id: string): Promise<Product | null>;
     findBySku(sku: string): Promise<Product | null>;
     findAll(filters?: ProductFilters): Promise<Product[]>;
-    update(id: string, data: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'stock'>>): Promise<Product | null>;
-    delete(id: string): Promise<boolean>;
+    update(id: string, data: Partial<ProductCreateData>): Promise<Product | null>;
+    setActive(id: string, active: boolean): Promise<Product | null>;
 }

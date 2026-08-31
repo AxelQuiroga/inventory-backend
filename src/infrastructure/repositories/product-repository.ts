@@ -1,12 +1,14 @@
 import { eq, like, and, gte, lte, sql, asc, desc, ilike } from 'drizzle-orm';
 import { db } from '../database';
 import { products } from '../database/schema/products';
-import type { ProductRepository, ProductFilters } from '../../domain/interfaces/product-repository';
+import type { ProductRepository, ProductFilters, ProductCreateData } from '../../domain/interfaces/product-repository';
 import type { Product } from '../../domain/entities/product';
 
 export class DrizzleProductRepository implements ProductRepository {
 
-  async create(data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> {
+  async create(data: ProductCreateData): Promise<Product> {
+    // stock y active no vienen del input: la DB aplica sus defaults (0 y true).
+    // El stock inicial siempre entra vía un movimiento IN.
     const [created] = await db
       .insert(products)
       .values({
@@ -16,7 +18,6 @@ export class DrizzleProductRepository implements ProductRepository {
         category: data.category,
         unit: data.unit,
         price: String(data.price),
-        stock: data.stock,
         minStock: data.minStock,
       })
       .returning();
@@ -48,6 +49,14 @@ export class DrizzleProductRepository implements ProductRepository {
 
   async findAll(filters?: ProductFilters): Promise<Product[]> {
     const conditions = this.buildConditions(filters);
+
+    // Por defecto solo productos activos (soft delete). Solo el flag
+    // includeInactive (restringido a ADMIN en la capa de presentación)
+    // expone los desactivados.
+    if (!filters?.includeInactive) {
+      conditions.push(eq(products.active, true));
+    }
+
     const order = this.buildOrder(filters);
     const { offset, limit } = this.buildPagination(filters);
 
@@ -64,7 +73,7 @@ export class DrizzleProductRepository implements ProductRepository {
 
   async update(
     id: string,
-    data: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>
+    data: Partial<ProductCreateData>
   ): Promise<Product | null> {
     const updateData: Record<string, unknown> = {};
 
@@ -87,13 +96,14 @@ export class DrizzleProductRepository implements ProductRepository {
     return updated ? this.toDomain(updated) : null;
   }
 
-  async delete(id: string): Promise<boolean> {
-    const [deleted] = await db
-      .delete(products)
+  async setActive(id: string, active: boolean): Promise<Product | null> {
+    const [updated] = await db
+      .update(products)
+      .set({ active, updatedAt: new Date() })
       .where(eq(products.id, id))
       .returning();
 
-    return !!deleted;
+    return updated ? this.toDomain(updated) : null;
   }
 
   // --- Métodos privados ---
@@ -109,6 +119,7 @@ export class DrizzleProductRepository implements ProductRepository {
       price: Number(row.price),
       stock: row.stock,
       minStock: row.minStock,
+      active: row.active,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -156,11 +167,10 @@ export class DrizzleProductRepository implements ProductRepository {
     return [direction(columnMap[column])];
   }
 
-    private buildPagination(filters?: ProductFilters) {
+  private buildPagination(filters?: ProductFilters) {
     const limit = filters?.limit ?? 20;
     const page = filters?.page ?? 1;
     const offset = (page - 1) * limit;
     return { offset, limit };
   }
-  
 }

@@ -7,7 +7,9 @@ export const createProductSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   unit: z.string().min(1, 'Unit is required'),
   price: z.number().positive('Price must be positive'),
-  stock: z.number().int().min(0, 'Stock cannot be negative'),
+  // stock NO se crea con el producto: el stock inicial entra vía un
+  // movimiento IN (razón "Stock inicial"). Invariante: todo cambio de
+  // stock genera un movimiento.
   minStock: z.number().int().min(0, 'Min stock cannot be negative').default(5),
 });
 
@@ -28,6 +30,7 @@ export const productQuerySchema = z.object({
   minPrice: z.coerce.number().positive().optional(),
   maxPrice: z.coerce.number().positive().optional(),
   lowStock: z.coerce.boolean().optional(),
+  includeInactive: z.coerce.boolean().optional(),
   sortBy: z.enum(['name', 'price', 'stock', 'createdAt']).optional(),
   order: z.enum(['asc', 'desc']).optional(),
   page: z.coerce.number().int().positive().optional().default(1),
@@ -37,3 +40,8 @@ export const productQuerySchema = z.object({
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type ProductQueryInput = z.infer<typeof productQuerySchema>;
+
+// Params de rutas con :id — un UUID malformado debe dar 400, no 500.
+export const productParamsSchema = z.object({
+  id: z.string().uuid('Invalid product ID'),
+});

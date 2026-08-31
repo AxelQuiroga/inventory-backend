@@ -1,4 +1,5 @@
-import { pgTable, uuid, varchar, text, integer, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, integer, timestamp, check } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { products } from './products.js';
 import { users } from './users.js';
 
@@ -15,4 +16,7 @@ export const movements = pgTable('movements', {
   quantity: integer('quantity').notNull(),
   reason: text('reason').notNull(), // Motivo del movimiento
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => [
+  check('movement_type_check', sql`${table.type} IN ('IN', 'OUT')`),
+  check('movements_quantity_positive', sql`${table.quantity} > 0`),
+]);

@@ -1,4 +1,4 @@
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, gte, sql } from 'drizzle-orm';
 import { db } from '../database';
 import { movements } from '../database/schema/movements';
 import { products } from '../database/schema/products';
@@ -9,17 +9,32 @@ export class DrizzleMovementRepository implements MovementRepository {
 
   async createEntry(data: CreateMovementData): Promise<Movement> {
     return db.transaction(async (tx) => {
-      // 1. Verificar que el producto exista
-      const [product] = await tx
-        .select()
-        .from(products)
-        .where(eq(products.id, data.productId));
+      // 1. UPDATE atómico: suma stock solo si el producto existe y está activo.
+      //    La base compara contra el stock actual (no un valor leído antes),
+      //    por lo que dos IN concurrentes no pierden unidades.
+      const [updated] = await tx
+        .update(products)
+        .set({
+          stock: sql`${products.stock} + ${data.quantity}`,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(products.id, data.productId), eq(products.active, true)))
+        .returning();
 
-      if (!product) {
-        throw new Error('Product not found');
+      if (!updated) {
+        // 2. Diagnóstico: distinguir 404 (no existe) de 400 (inactivo)
+        const [current] = await tx
+          .select()
+          .from(products)
+          .where(eq(products.id, data.productId));
+
+        if (!current) {
+          throw new Error('Product not found');
+        }
+        throw new Error('Product is inactive');
       }
 
-      // 2. Crear el movimiento
+      // 3. Crear el movimiento dentro de la misma transacción
       const [movement] = await tx
         .insert(movements)
         .values({
@@ -35,37 +50,45 @@ export class DrizzleMovementRepository implements MovementRepository {
         throw new Error('Failed to create movement');
       }
 
-      // 3. Sumar stock
-      await tx
-        .update(products)
-        .set({
-          stock: product.stock + data.quantity,
-          updatedAt: new Date(),
-        })
-        .where(eq(products.id, data.productId));
-
       return this.toDomain(movement);
     });
   }
 
   async createExit(data: CreateMovementData): Promise<Movement> {
     return db.transaction(async (tx) => {
-      // 1. Verificar que el producto exista
-      const [product] = await tx
-        .select()
-        .from(products)
-        .where(eq(products.id, data.productId));
+      // 1. UPDATE atómico con guarda de stock:
+      //    resta solo si el producto existe, está activo Y el stock actual
+      //    alcanza. Dos OUT concurrentes no pueden gastar más del disponible.
+      const [updated] = await tx
+        .update(products)
+        .set({
+          stock: sql`${products.stock} - ${data.quantity}`,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(products.id, data.productId),
+          eq(products.active, true),
+          gte(products.stock, data.quantity),
+        ))
+        .returning();
 
-      if (!product) {
-        throw new Error('Product not found');
-      }
+      if (!updated) {
+        // 2. Diagnóstico: 404 (no existe) vs 400 (inactivo) vs 400 (sin stock)
+        const [current] = await tx
+          .select()
+          .from(products)
+          .where(eq(products.id, data.productId));
 
-      // 2. Verificar stock suficiente
-      if (product.stock < data.quantity) {
+        if (!current) {
+          throw new Error('Product not found');
+        }
+        if (!current.active) {
+          throw new Error('Product is inactive');
+        }
         throw new Error('Insufficient stock');
       }
 
-      // 3. Crear el movimiento
+      // 3. Crear el movimiento dentro de la misma transacción
       const [movement] = await tx
         .insert(movements)
         .values({
@@ -80,15 +103,6 @@ export class DrizzleMovementRepository implements MovementRepository {
       if (!movement) {
         throw new Error('Failed to create movement');
       }
-
-      // 4. Restar stock
-      await tx
-        .update(products)
-        .set({
-          stock: product.stock - data.quantity,
-          updatedAt: new Date(),
-        })
-        .where(eq(products.id, data.productId));
 
       return this.toDomain(movement);
     });

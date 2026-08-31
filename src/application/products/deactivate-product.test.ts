@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { GetProduct } from './get-product';
+import { DeactivateProduct } from './deactivate-product';
 import type { ProductRepository } from '../../domain/interfaces/product-repository';
 import type { Product } from '../../domain/entities/product';
 
@@ -27,24 +27,24 @@ const repository: ProductRepository = {
   setActive: vi.fn(),
 };
 
-const useCase = new GetProduct(repository);
+const useCase = new DeactivateProduct(repository);
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('GetProduct', () => {
-  it('devuelve el producto cuando existe', async () => {
-    vi.mocked(repository.findById).mockResolvedValue(product);
+describe('DeactivateProduct', () => {
+  it('desactiva el producto (soft delete) y lo devuelve', async () => {
+    vi.mocked(repository.setActive).mockResolvedValue({ ...product, active: false });
 
     const result = await useCase.execute('prod-1');
 
-    expect(repository.findById).toHaveBeenCalledWith('prod-1');
-    expect(result).toEqual(product);
+    expect(repository.setActive).toHaveBeenCalledWith('prod-1', false);
+    expect(result?.active).toBe(false);
   });
 
-  it('devuelve null cuando no existe', async () => {
-    vi.mocked(repository.findById).mockResolvedValue(null);
+  it('devuelve null cuando el producto no existe', async () => {
+    vi.mocked(repository.setActive).mockResolvedValue(null);
 
     const result = await useCase.execute('no-existe');
 

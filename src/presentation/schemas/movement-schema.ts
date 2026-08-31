@@ -7,3 +7,8 @@ export const registerMovementSchema = z.object({
 });
 
 export type RegisterMovementInput = z.infer<typeof registerMovementSchema>
+
+// Params de rutas con :productId — un UUID malformado debe dar 400, no 500.
+export const movementParamsSchema = z.object({
+  productId: z.string().uuid('Invalid product ID'),
+});

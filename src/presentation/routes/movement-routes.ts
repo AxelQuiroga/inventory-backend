@@ -5,6 +5,7 @@ import { RegisterStockEntry } from '../../application/movements/register-entry';
 import { RegisterStockExit } from '../../application/movements/register-exit';
 import { GetMovementHistory } from '../../application/movements/get-history';
 import { authenticate } from '../middleware/authenticate';
+import { authorize } from '../middleware/authorize';
 
 export async function movementRoutes(app: FastifyInstance) {
   const repository = new DrizzleMovementRepository();
@@ -14,9 +15,9 @@ export async function movementRoutes(app: FastifyInstance) {
 
   const controller = new MovementController(registerEntry, registerExit, getHistory);
 
-  app.addHook('preHandler', authenticate);
-
-  app.post('/movements/entry', controller.createEntry.bind(controller));
-  app.post('/movements/exit', controller.createExit.bind(controller));
-  app.get('/movements/history/:productId', controller.getHistory.bind(controller));
+  // Matriz de autorización: registrar movimientos = ADMIN + OPERATOR;
+  // consultar historial = cualquier rol autenticado
+  app.post('/movements/entry', { preHandler: [authenticate, authorize('ADMIN', 'OPERATOR')] }, controller.createEntry.bind(controller));
+  app.post('/movements/exit', { preHandler: [authenticate, authorize('ADMIN', 'OPERATOR')] }, controller.createExit.bind(controller));
+  app.get('/movements/history/:productId', { preHandler: [authenticate] }, controller.getHistory.bind(controller));
 }

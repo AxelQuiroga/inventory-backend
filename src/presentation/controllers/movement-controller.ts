@@ -2,7 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { RegisterStockEntry } from '../../application/movements/register-entry';
 import { RegisterStockExit } from '../../application/movements/register-exit';
 import { GetMovementHistory } from '../../application/movements/get-history';
-import { registerMovementSchema } from '../schemas/movement-schema';
+import { registerMovementSchema, movementParamsSchema } from '../schemas/movement-schema';
 
 export class MovementController {
   constructor(
@@ -19,14 +19,19 @@ export class MovementController {
 
     try {
       const user = request.user as { userId: string };
-const movement = await this.registerEntryUseCase.execute({
-  ...parsed.data,
-  userId: user.userId,
-});
+      const movement = await this.registerEntryUseCase.execute({
+        ...parsed.data,
+        userId: user.userId,
+      });
       return reply.status(201).send(movement);
     } catch (error) {
-      if (error instanceof Error && error.message === 'Product not found') {
-        return reply.status(404).send({ message: 'Product not found' });
+      if (error instanceof Error) {
+        if (error.message === 'Product not found') {
+          return reply.status(404).send({ message: 'Product not found' });
+        }
+        if (error.message === 'Product is inactive') {
+          return reply.status(400).send({ message: 'Product is inactive' });
+        }
       }
       return reply.status(500).send({ message: 'Internal server error' });
     }
@@ -40,15 +45,18 @@ const movement = await this.registerEntryUseCase.execute({
 
     try {
       const user = request.user as { userId: string };
-const movement = await this.registerEntryUseCase.execute({
-  ...parsed.data,
-  userId: user.userId,
-});
+      const movement = await this.registerExitUseCase.execute({
+        ...parsed.data,
+        userId: user.userId,
+      });
       return reply.status(201).send(movement);
     } catch (error) {
       if (error instanceof Error) {
         if (error.message === 'Product not found') {
           return reply.status(404).send({ message: 'Product not found' });
+        }
+        if (error.message === 'Product is inactive') {
+          return reply.status(400).send({ message: 'Product is inactive' });
         }
         if (error.message === 'Insufficient stock') {
           return reply.status(400).send({ message: 'Insufficient stock' });
@@ -59,7 +67,11 @@ const movement = await this.registerEntryUseCase.execute({
   }
 
   async getHistory(request: FastifyRequest, reply: FastifyReply) {
-    const { productId } = request.params as { productId: string };
+    const params = movementParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.status(400).send({ message: 'Invalid params', errors: params.error.flatten() });
+    }
+    const { productId } = params.data;
 
     try {
       const history = await this.getHistoryUseCase.execute(productId);
