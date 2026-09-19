@@ -1,0 +1,281 @@
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import { randomUUID } from 'node:crypto';
+
+import {
+  buildE2eApp,
+  closeE2eApp,
+  resetE2eDb,
+  authHeader,
+  uniqueSku,
+  createProductViaApi,
+  type E2eCredentials,
+} from '../../infrastructure/database/test-e2e-utils';
+
+// E2E del ciclo de vida de productos y sus filtros, por HTTP real.
+// Invariante clave: un producto nace con stock 0; el stock entra por movimientos.
+
+let app: FastifyInstance;
+let creds: E2eCredentials;
+let adminToken: string;
+
+async function login(email: string, password: string): Promise<string> {
+  const res = await app.inject({ method: 'POST', url: '/auth/login', payload: { email, password } });
+  expect(res.statusCode).toBe(200);
+  return JSON.parse(res.body).token as string;
+}
+
+async function addStock(productId: string, quantity: number) {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/movements/entry',
+    headers: authHeader(adminToken),
+    payload: { productId, quantity, reason: 'Stock inicial' },
+  });
+  expect(res.statusCode).toBe(201);
+}
+
+beforeAll(async () => {
+  app = await buildE2eApp();
+});
+
+afterAll(async () => closeE2eApp(app));
+
+beforeEach(async () => {
+  creds = await resetE2eDb();
+  adminToken = await login(creds.admin.email, creds.admin.password);
+});
+
+describe('PRODUCTS E2E — ciclo de vida', () => {
+  it('crear producto: 201, nace activo y con stock 0', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/products',
+      headers: authHeader(adminToken),
+      payload: { name: 'Martillo', sku: uniqueSku(), category: 'Herramientas', unit: 'unit', price: 25.5 },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = JSON.parse(res.body);
+    expect(body.name).toBe('Martillo');
+    expect(body.stock).toBe(0);
+    expect(body.active).toBe(true);
+    expect(body.minStock).toBe(5); // default del schema
+    expect(body.id).toBeTruthy();
+  });
+
+  it('crear producto con SKU duplicado: 409', async () => {
+    const sku = uniqueSku();
+    await createProductViaApi(app, adminToken, { sku });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/products',
+      headers: authHeader(adminToken),
+      payload: { name: 'Duplicado', sku, category: 'E2E', unit: 'unit', price: 1 },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body).message).toBe('SKU already exists');
+  });
+
+  it('crear producto con datos inválidos: 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/products',
+      headers: authHeader(adminToken),
+      payload: { name: '', sku: '', category: '', unit: '', price: -5 },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('consultar producto por id: 200; inexistente: 404; malformado: 400', async () => {
+    const { id } = await createProductViaApi(app, adminToken);
+
+    const found = await app.inject({ method: 'GET', url: `/products/${id}`, headers: authHeader(adminToken) });
+    expect(found.statusCode).toBe(200);
+    expect(JSON.parse(found.body).id).toBe(id);
+
+    const missing = await app.inject({
+      method: 'GET',
+      url: `/products/${randomUUID()}`,
+      headers: authHeader(adminToken),
+    });
+    expect(missing.statusCode).toBe(404);
+
+    const malformed = await app.inject({
+      method: 'GET',
+      url: '/products/not-a-uuid',
+      headers: authHeader(adminToken),
+    });
+    expect(malformed.statusCode).toBe(400);
+  });
+
+  it('actualizar producto: 200 y persiste los cambios', async () => {
+    const { id, sku } = await createProductViaApi(app, adminToken, { name: 'Nombre viejo', price: 10 });
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/products/${id}`,
+      headers: authHeader(adminToken),
+      payload: { name: 'Nombre nuevo', price: 99.99, minStock: 8 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.name).toBe('Nombre nuevo');
+    expect(body.price).toBe(99.99);
+    expect(body.minStock).toBe(8);
+    expect(body.sku).toBe(sku); // el SKU no cambió si no se pidió
+
+    // Persistencia real: un GET posterior devuelve lo actualizado
+    const verify = await app.inject({ method: 'GET', url: `/products/${id}`, headers: authHeader(adminToken) });
+    expect(JSON.parse(verify.body).name).toBe('Nombre nuevo');
+  });
+
+  it('desactivar producto: active=false, sale del listado, sigue consultable por id', async () => {
+    const { id } = await createProductViaApi(app, adminToken, { name: 'A desactivar' });
+
+    const off = await app.inject({
+      method: 'POST',
+      url: `/products/${id}/deactivate`,
+      headers: authHeader(adminToken),
+    });
+    expect(off.statusCode).toBe(200);
+    expect(JSON.parse(off.body).active).toBe(false);
+
+    // Ya no aparece en el listado por defecto
+    const list = await app.inject({ method: 'GET', url: '/products', headers: authHeader(adminToken) });
+    const ids = JSON.parse(list.body).map((p: { id: string }) => p.id);
+    expect(ids).not.toContain(id);
+
+    // Pero sigue consultable por id con su historial intacto (soft delete)
+    const byId = await app.inject({ method: 'GET', url: `/products/${id}`, headers: authHeader(adminToken) });
+    expect(byId.statusCode).toBe(200);
+    expect(JSON.parse(byId.body).active).toBe(false);
+
+    // ADMIN puede verlo con includeInactive=true
+    const withInactive = await app.inject({
+      method: 'GET',
+      url: '/products?includeInactive=true',
+      headers: authHeader(adminToken),
+    });
+    const inactiveIds = JSON.parse(withInactive.body).map((p: { id: string }) => p.id);
+    expect(inactiveIds).toContain(id);
+  });
+
+  it('reactivar producto: vuelve al listado activo', async () => {
+    const { id } = await createProductViaApi(app, adminToken, { name: 'A reactivar' });
+
+    await app.inject({ method: 'POST', url: `/products/${id}/deactivate`, headers: authHeader(adminToken) });
+
+    const on = await app.inject({
+      method: 'POST',
+      url: `/products/${id}/reactivate`,
+      headers: authHeader(adminToken),
+    });
+    expect(on.statusCode).toBe(200);
+    expect(JSON.parse(on.body).active).toBe(true);
+
+    const list = await app.inject({ method: 'GET', url: '/products', headers: authHeader(adminToken) });
+    const ids = JSON.parse(list.body).map((p: { id: string }) => p.id);
+    expect(ids).toContain(id);
+  });
+});
+
+describe('PRODUCTS E2E — filtros', () => {
+  it('search filtra por fragmento del nombre (case-insensitive)', async () => {
+    await createProductViaApi(app, adminToken, { name: 'Martillo E2E Premium' });
+    await createProductViaApi(app, adminToken, { name: 'Taladro E2E' });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/products?search=martillo',
+      headers: authHeader(adminToken),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const names = JSON.parse(res.body).map((p: { name: string }) => p.name);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toBe('Martillo E2E Premium');
+  });
+
+  it('category filtra por categoría exacta', async () => {
+    await createProductViaApi(app, adminToken, { name: 'Producto A', category: 'Ferreteria' });
+    await createProductViaApi(app, adminToken, { name: 'Producto B', category: 'Electricidad' });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/products?category=Electricidad',
+      headers: authHeader(adminToken),
+    });
+
+    const names = JSON.parse(res.body).map((p: { name: string }) => p.name);
+    expect(names).toEqual(['Producto B']);
+  });
+
+  it('minPrice/maxPrice filtran por rango de precio', async () => {
+    await createProductViaApi(app, adminToken, { name: 'Barato', price: 5 });
+    await createProductViaApi(app, adminToken, { name: 'Medio', price: 50 });
+    await createProductViaApi(app, adminToken, { name: 'Caro', price: 500 });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/products?minPrice=10&maxPrice=100',
+      headers: authHeader(adminToken),
+    });
+
+    const names = JSON.parse(res.body).map((p: { name: string }) => p.name);
+    expect(names).toEqual(['Medio']);
+  });
+
+  it('sortBy=price&order=asc ordena ascendentemente', async () => {
+    await createProductViaApi(app, adminToken, { name: 'Precio 30', price: 30 });
+    await createProductViaApi(app, adminToken, { name: 'Precio 10', price: 10 });
+    await createProductViaApi(app, adminToken, { name: 'Precio 20', price: 20 });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/products?sortBy=price&order=asc',
+      headers: authHeader(adminToken),
+    });
+
+    const names = JSON.parse(res.body).map((p: { name: string }) => p.name);
+    expect(names).toEqual(['Precio 10', 'Precio 20', 'Precio 30']);
+  });
+
+  it('lowStock=true devuelve solo productos con stock <= minStock', async () => {
+    // Bajo stock: nace con 0 y minStock 10 → 0 <= 10
+    await createProductViaApi(app, adminToken, { name: 'Bajo stock', minStock: 10 });
+    // Stock sano: entra 8 con minStock 2 → 8 > 2
+    const sano = await createProductViaApi(app, adminToken, { name: 'Stock sano', minStock: 2 });
+    await addStock(sano.id, 8);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/products?lowStock=true',
+      headers: authHeader(adminToken),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const names = JSON.parse(res.body).map((p: { name: string }) => p.name);
+    expect(names).toContain('Bajo stock');
+    expect(names).not.toContain('Stock sano');
+  });
+
+  it('limit pagina el listado', async () => {
+    await createProductViaApi(app, adminToken, { name: 'Pag A' });
+    await createProductViaApi(app, adminToken, { name: 'Pag B' });
+    await createProductViaApi(app, adminToken, { name: 'Pag C' });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/products?limit=2',
+      headers: authHeader(adminToken),
+    });
+
+    const body = JSON.parse(res.body);
+    expect(body).toHaveLength(2);
+  });
+});

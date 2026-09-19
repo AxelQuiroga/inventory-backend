@@ -10,3 +10,9 @@ const pool = new pg.Pool({
 });
 
 export const db = drizzle(pool, { schema });
+
+// Cierre ordenado del pool (usado por los tests E2E para que el proceso
+// de Vitest termine sin handles abiertos). El bootstrap productivo no lo usa.
+export async function closeDb() {
+  await pool.end();
+}
