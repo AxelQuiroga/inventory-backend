@@ -15,6 +15,7 @@
     "db:seed": "tsx src/infrastructure/database/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
