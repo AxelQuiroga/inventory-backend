@@ -313,6 +313,15 @@ describe('PRODUCTS E2E — creación con stock inicial', () => {
     expect(movements[0].type).toBe('IN');
     expect(movements[0].quantity).toBe(250);
     expect(movements[0].reason).toBe('Stock inicial');
+
+    // El stock DEBE quedar persistido: la respuesta 201 no puede mentir
+    const persisted = await app.inject({
+      method: 'GET',
+      url: `/products/${product.id}`,
+      headers: authHeader(adminToken),
+    });
+    expect(persisted.statusCode).toBe(200);
+    expect(JSON.parse(persisted.body).stock).toBe(250);
   });
 
   it('initialStock 0 (o ausente): producto con stock 0 y SIN movimientos', async () => {

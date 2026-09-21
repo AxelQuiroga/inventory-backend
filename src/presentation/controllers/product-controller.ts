@@ -32,7 +32,7 @@ export class ProductController {
       });
       return reply.status(201).send(product);
     } catch (error) {
-      return this.handleError(error, reply);
+      return this.handleError(error, reply, request);
     }
   }
 
@@ -54,7 +54,7 @@ export class ProductController {
       const products = await this.listProductsUseCase.execute(parsed.data);
       return reply.send(products);
     } catch (error) {
-      return this.handleError(error, reply);
+      return this.handleError(error, reply, request);
     }
   }
 
@@ -72,7 +72,7 @@ export class ProductController {
       }
       return reply.send(product);
     } catch (error) {
-      return this.handleError(error, reply);
+      return this.handleError(error, reply, request);
     }
   }
 
@@ -94,7 +94,7 @@ export class ProductController {
       }
       return reply.send(product);
     } catch (error) {
-      return this.handleError(error, reply);
+      return this.handleError(error, reply, request);
     }
   }
 
@@ -112,7 +112,7 @@ export class ProductController {
       }
       return reply.send(product);
     } catch (error) {
-      return this.handleError(error, reply);
+      return this.handleError(error, reply, request);
     }
   }
 
@@ -130,11 +130,11 @@ export class ProductController {
       }
       return reply.send(product);
     } catch (error) {
-      return this.handleError(error, reply);
+      return this.handleError(error, reply, request);
     }
   }
 
-  private handleError(error: unknown, reply: FastifyReply) {
+  private handleError(error: unknown, reply: FastifyReply, request: FastifyRequest) {
     if (error instanceof Error) {
       if (error.message === 'SKU already exists') {
         return reply.status(409).send({ message: error.message });
@@ -143,6 +143,19 @@ export class ProductController {
         return reply.status(400).send({ message: error.message });
       }
     }
+    // La violación del constraint único de SKU (23505) es defensa en
+    // profundidad: findBySku ya lo cubre, pero entre ese check y el INSERT
+    // puede colarse una carrera (o el producto puede existir sin pasar por
+    // el use case). Sin este mapeo, Postgres la enmascara como 500.
+    const dbError = error as { code?: string };
+    if (dbError.code === '23505') {
+      request.log.warn({ error }, 'Unique constraint violation on products');
+      return reply.status(409).send({ message: 'SKU already exists' });
+    }
+    // El 500 genérico enmascara la causa real (ej: esquema de DB
+    // desincronizado, como la columna unit que provocó este incidente).
+    // Sin el log, el diagnóstico es a ciegas: "no hay ningún error real".
+    request.log.error({ error }, 'Unexpected error in product controller');
     return reply.status(500).send({ message: 'Internal server error' });
   }
 }

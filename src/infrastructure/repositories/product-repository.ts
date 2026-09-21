@@ -30,9 +30,11 @@ export class DrizzleProductRepository implements ProductRepository {
   }
 
   // Creación atómica: producto + movimiento IN ("Stock inicial") en una
-  // única transacción. Si la inserción del movimiento falla (ej: userId
-  // inexistente), el producto NO queda creado. Invariante preservada:
-  // todo stock entra por un movimiento.
+  // única transacción. La columna stock se materializa en el MISMO insert
+  // (igual que createEntry/createExit actualizan el saldo): el movimiento
+  // IN documenta el origen, la columna refleja el saldo. Si la inserción
+  // del movimiento falla (ej: userId inexistente), el producto NO queda
+  // creado. Invariante preservada: todo stock entra por un movimiento.
   async createWithInitialStock(data: ProductWithInitialStock): Promise<Product> {
     return db.transaction(async (tx) => {
       const [created] = await tx
@@ -44,6 +46,9 @@ export class DrizzleProductRepository implements ProductRepository {
           category: data.product.category,
           price: String(data.product.price),
           minStock: data.product.minStock,
+          // El saldo del stock inicial se persiste acá: sin esto, la DB
+          // quedaría con stock 0 y la respuesta de creación mentiría.
+          stock: data.initialStock,
         })
         .returning();
 
@@ -59,7 +64,8 @@ export class DrizzleProductRepository implements ProductRepository {
         reason: 'Stock inicial',
       });
 
-      return { ...this.toDomain(created), stock: data.initialStock };
+      // returning() ya trae el stock real: no hace falta "inventarlo"
+      return this.toDomain(created);
     });
   }
 
