@@ -2,6 +2,7 @@ import { pgTable, uuid, varchar, text, integer, timestamp, check } from 'drizzle
 import { sql } from 'drizzle-orm';
 import { products } from './products.js';
 import { users } from './users.js';
+import { sales } from './sales.js';
 
 export enum MovementType {
   IN = 'IN',
@@ -15,6 +16,9 @@ export const movements = pgTable('movements', {
   type: varchar('type', { length: 10 }).notNull(), // 'IN' o 'OUT'
   quantity: integer('quantity').notNull(),
   reason: text('reason').notNull(), // Motivo del movimiento
+  // Nullable: solo los OUT generados por una venta llevan el id de la venta.
+  // Los movimientos sueltos (entradas, ajustes) no pertenecen a ninguna.
+  saleId: uuid('sale_id').references(() => sales.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
   check('movement_type_check', sql`${table.type} IN ('IN', 'OUT')`),
