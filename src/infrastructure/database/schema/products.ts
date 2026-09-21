@@ -7,7 +7,6 @@ export const products = pgTable('products', {
   description: text('description').default(''),
   sku: varchar('sku', { length: 100 }).notNull().unique(),
   category: varchar('category', { length: 100 }).notNull(),
-  unit: varchar('unit', { length: 50 }).notNull(), // 'pieza', 'kg', 'litro', etc.
   price: numeric('price', { precision: 10, scale: 2 }).notNull(),
   stock: integer('stock').notNull().default(0),
   minStock: integer('min_stock').notNull().default(5),

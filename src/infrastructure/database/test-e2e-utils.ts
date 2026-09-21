@@ -84,7 +84,6 @@ export async function createProductViaApi(
       name: 'E2E Product',
       sku,
       category: 'E2E',
-      unit: 'unit',
       price: 10,
       ...overrides,
     },

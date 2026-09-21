@@ -5,7 +5,6 @@ export const createProductSchema = z.object({
   description: z.string().optional().default(''),
   sku: z.string().min(1, 'SKU is required'),
   category: z.string().min(1, 'Category is required'),
-  unit: z.string().min(1, 'Unit is required'),
   price: z.number().positive('Price must be positive'),
   // stock NO se crea con el producto: el stock inicial entra vía un
   // movimiento IN (razón "Stock inicial"). Invariante: todo cambio de
@@ -21,7 +20,6 @@ export const updateProductSchema = z.object({
   description: z.string().optional(),
   sku: z.string().min(1).optional(),
   category: z.string().min(1).optional(),
-  unit: z.string().min(1).optional(),
   price: z.number().positive().optional(),
   //stock: z.number().int().min(0).optional(),
   minStock: z.number().int().min(0).optional(),

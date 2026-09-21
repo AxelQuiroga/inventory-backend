@@ -102,7 +102,7 @@ describe('RBAC E2E', () => {
       method: 'POST',
       url: '/products',
       headers: authHeader(token),
-      payload: { name: 'X', sku: uniqueSku(), category: 'E2E', unit: 'unit', price: 1 },
+      payload: { name: 'X', sku: uniqueSku(), category: 'E2E', price: 1 },
     });
     expect(create.statusCode).toBe(403);
 
@@ -131,7 +131,7 @@ describe('RBAC E2E', () => {
       method: 'POST',
       url: '/products',
       headers: authHeader(adminToken),
-      payload: { name: 'Solo lectura', sku: uniqueSku(), category: 'E2E', unit: 'unit', price: 5 },
+      payload: { name: 'Solo lectura', sku: uniqueSku(), category: 'E2E', price: 5 },
     });
     const productId = JSON.parse(created.body).id as string;
 
@@ -160,7 +160,7 @@ describe('RBAC E2E', () => {
       method: 'POST',
       url: '/products',
       headers: authHeader(adminToken),
-      payload: { name: 'Operable', sku: uniqueSku(), category: 'E2E', unit: 'unit', price: 5 },
+      payload: { name: 'Operable', sku: uniqueSku(), category: 'E2E', price: 5 },
     });
     const productId = JSON.parse(created.body).id as string;
 
@@ -184,7 +184,7 @@ describe('RBAC E2E', () => {
       method: 'POST',
       url: '/products',
       headers: authHeader(operatorToken),
-      payload: { name: 'No permitido', sku: uniqueSku(), category: 'E2E', unit: 'unit', price: 5 },
+      payload: { name: 'No permitido', sku: uniqueSku(), category: 'E2E', price: 5 },
     });
     expect(denied.statusCode).toBe(403);
   });

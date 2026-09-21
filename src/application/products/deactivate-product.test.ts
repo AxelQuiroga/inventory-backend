@@ -9,7 +9,6 @@ const product: Product = {
   description: 'Laptop 14"',
   sku: 'LAP-001',
   category: 'Electrónica',
-  unit: 'unit',
   price: 899.99,
   stock: 10,
   minStock: 5,

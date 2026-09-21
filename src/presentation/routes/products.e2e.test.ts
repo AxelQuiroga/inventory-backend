@@ -52,7 +52,7 @@ describe('PRODUCTS E2E — ciclo de vida', () => {
       method: 'POST',
       url: '/products',
       headers: authHeader(adminToken),
-      payload: { name: 'Martillo', sku: uniqueSku(), category: 'Herramientas', unit: 'unit', price: 25.5 },
+      payload: { name: 'Martillo', sku: uniqueSku(), category: 'Herramientas', price: 25.5 },
     });
 
     expect(res.statusCode).toBe(201);
@@ -72,7 +72,7 @@ describe('PRODUCTS E2E — ciclo de vida', () => {
       method: 'POST',
       url: '/products',
       headers: authHeader(adminToken),
-      payload: { name: 'Duplicado', sku, category: 'E2E', unit: 'unit', price: 1 },
+      payload: { name: 'Duplicado', sku, category: 'E2E', price: 1 },
     });
 
     expect(res.statusCode).toBe(409);
@@ -84,7 +84,7 @@ describe('PRODUCTS E2E — ciclo de vida', () => {
       method: 'POST',
       url: '/products',
       headers: authHeader(adminToken),
-      payload: { name: '', sku: '', category: '', unit: '', price: -5 },
+      payload: { name: '', sku: '', category: '', price: -5 },
     });
 
     expect(res.statusCode).toBe(400);
@@ -291,7 +291,6 @@ describe('PRODUCTS E2E — creación con stock inicial', () => {
         name: 'Tornillo',
         sku,
         category: 'Ferretería',
-        unit: 'unit',
         price: 1.5,
         minStock: 100,
         initialStock: 250,
@@ -322,7 +321,7 @@ describe('PRODUCTS E2E — creación con stock inicial', () => {
       method: 'POST',
       url: '/products',
       headers: authHeader(adminToken),
-      payload: { name: 'Sin stock', sku, category: 'E2E', unit: 'unit', price: 1, initialStock: 0 },
+      payload: { name: 'Sin stock', sku, category: 'E2E', price: 1, initialStock: 0 },
     });
 
     expect(res.statusCode).toBe(201);
@@ -343,7 +342,7 @@ describe('PRODUCTS E2E — creación con stock inicial', () => {
       url: '/products',
       headers: authHeader(adminToken),
       payload: {
-        name: 'Inválido', sku: uniqueSku(), category: 'E2E', unit: 'unit',
+        name: 'Inválido', sku: uniqueSku(), category: 'E2E',
         price: 1, initialStock: -3,
       },
     });
@@ -367,7 +366,7 @@ describe('PRODUCTS E2E — creación con stock inicial', () => {
       url: '/products',
       headers: authHeader(operatorToken),
       payload: {
-        name: 'X', sku: uniqueSku(), category: 'E2E', unit: 'unit',
+        name: 'X', sku: uniqueSku(), category: 'E2E',
         price: 1, initialStock: 5,
       },
     });

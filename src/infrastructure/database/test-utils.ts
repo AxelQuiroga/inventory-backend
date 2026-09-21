@@ -47,7 +47,6 @@ export async function createProduct(overrides: Partial<typeof products.$inferIns
       name: 'Test Product',
       sku: `SKU-${randomUUID()}`,
       category: 'Test',
-      unit: 'unit',
       price: '10.00',
       ...overrides,
     })

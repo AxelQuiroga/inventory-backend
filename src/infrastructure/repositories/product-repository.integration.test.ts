@@ -33,7 +33,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
       description: 'Laptop 14"',
       sku: 'LAP-INT-001',
       category: 'Electrónica',
-      unit: 'unit',
       price: 899.99,
       minStock: 5,
     });
@@ -48,7 +47,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
       description: '',
       sku: 'MESA-001',
       category: 'Muebles',
-      unit: 'unit',
       price: 100,
       minStock: 5,
     });
@@ -80,7 +78,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
         description: '',
         sku: 'TORN-001',
         category: 'Ferretería',
-        unit: 'unit',
         price: 1.5,
         minStock: 100,
       },
@@ -111,7 +108,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
           description: '',
           sku,
           category: 'Ferretería',
-          unit: 'unit',
           price: 1.5,
           minStock: 5,
         },
@@ -131,7 +127,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
       description: '',
       sku: 'SILLA-001',
       category: 'Muebles',
-      unit: 'unit',
       price: 50,
       minStock: 5,
     });
@@ -165,7 +160,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
       description: '',
       sku: 'SILLA-002',
       category: 'Muebles',
-      unit: 'unit',
       price: 50,
       minStock: 5,
     });
@@ -205,7 +199,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
       description: '',
       sku: 'SILLA-003',
       category: 'Muebles',
-      unit: 'unit',
       price: 50,
       minStock: 5,
     });
@@ -222,7 +215,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
       description: '',
       sku: 'SILLA-004',
       category: 'Muebles',
-      unit: 'unit',
       price: 50,
       minStock: 5,
     });
@@ -248,7 +240,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
       description: '',
       sku: 'A-001',
       category: 'Cat',
-      unit: 'unit',
       price: 1,
       minStock: 5,
     });
@@ -257,7 +248,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
       description: '',
       sku: 'B-001',
       category: 'Cat',
-      unit: 'unit',
       price: 1,
       minStock: 5,
     });
@@ -290,7 +280,6 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
       description: '',
       sku: 'NEG-001',
       category: 'Muebles',
-      unit: 'unit',
       price: 50,
       minStock: 5,
     });
@@ -301,8 +290,8 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
 
     await expect(
       testPool.query(
-        `INSERT INTO products (name, sku, category, unit, price, stock)
-         VALUES ('X', 'NEG-002', 'C', 'unit', '10.00', -5)`,
+        `INSERT INTO products (name, sku, category, price, stock)
+         VALUES ('X', 'NEG-002', 'C', '10.00', -5)`,
       ),
     ).rejects.toThrow(/check/i);
   });

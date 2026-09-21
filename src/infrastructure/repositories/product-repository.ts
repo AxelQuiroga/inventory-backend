@@ -17,7 +17,6 @@ export class DrizzleProductRepository implements ProductRepository {
         description: data.description,
         sku: data.sku,
         category: data.category,
-        unit: data.unit,
         price: String(data.price),
         minStock: data.minStock,
       })
@@ -43,7 +42,6 @@ export class DrizzleProductRepository implements ProductRepository {
           description: data.product.description,
           sku: data.product.sku,
           category: data.product.category,
-          unit: data.product.unit,
           price: String(data.product.price),
           minStock: data.product.minStock,
         })
@@ -117,7 +115,6 @@ export class DrizzleProductRepository implements ProductRepository {
     if (data.description !== undefined) updateData.description = data.description;
     if (data.sku !== undefined) updateData.sku = data.sku;
     if (data.category !== undefined) updateData.category = data.category;
-    if (data.unit !== undefined) updateData.unit = data.unit;
     if (data.price !== undefined) updateData.price = String(data.price);
     if (data.minStock !== undefined) updateData.minStock = data.minStock;
 
@@ -151,7 +148,6 @@ export class DrizzleProductRepository implements ProductRepository {
       description: row.description ?? '',
       sku: row.sku,
       category: row.category,
-      unit: row.unit,
       price: Number(row.price),
       stock: row.stock,
       minStock: row.minStock,
