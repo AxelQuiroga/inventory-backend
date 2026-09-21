@@ -113,3 +113,35 @@ describe('MovementController.createEntry', () => {
     expect(reply.send).toHaveBeenCalledWith({ message: 'Product is inactive' });
   });
 });
+
+describe('MovementController.getHistory', () => {
+  it('parsea la query de paginación y la pasa al use case', async () => {
+    vi.mocked(movementRepository.findByProductId).mockResolvedValue([entryMovement]);
+
+    const reply = makeReply();
+    await controller.getHistory(
+      makeRequest({
+        params: { productId: PRODUCT_ID },
+        query: { page: '2', limit: '10' },
+      }),
+      reply,
+    );
+
+    expect(movementRepository.findByProductId).toHaveBeenCalledWith(PRODUCT_ID, { page: 2, limit: 10 });
+    expect(reply.send).toHaveBeenCalledWith([entryMovement]);
+  });
+
+  it('query inválida devuelve 400 sin tocar el repositorio', async () => {
+    const reply = makeReply();
+    await controller.getHistory(
+      makeRequest({
+        params: { productId: PRODUCT_ID },
+        query: { limit: '0' },
+      }),
+      reply,
+    );
+
+    expect(reply.status).toHaveBeenCalledWith(400);
+    expect(movementRepository.findByProductId).not.toHaveBeenCalled();
+  });
+});

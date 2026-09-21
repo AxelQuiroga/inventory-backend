@@ -217,4 +217,28 @@ describe('DrizzleMovementRepository (integración real con PostgreSQL)', () => {
     expect(original!.type).toBe(MovementType.IN);
     expect(original!.reason).toBe('Stock inicial');
   });
+
+  it('16. findByProductId pagina con limit/page (más reciente primero)', async () => {
+    const product = await createProduct();
+    const user = await createUser();
+
+    for (let i = 1; i <= 5; i++) {
+      await repo.createEntry({ productId: product.id, userId: user.id, quantity: i, reason: `Mov ${i}` });
+    }
+
+    // Sin opciones devuelve todo, más reciente primero
+    const all = await repo.findByProductId(product.id);
+    expect(all).toHaveLength(5);
+    expect(all[0]!.reason).toBe('Mov 5');
+
+    // Página 2 con limit 2 => [Mov 3, Mov 2]
+    const page2 = await repo.findByProductId(product.id, { page: 2, limit: 2 });
+    expect(page2).toHaveLength(2);
+    expect(page2[0]!.reason).toBe('Mov 3');
+    expect(page2[1]!.reason).toBe('Mov 2');
+
+    // Página 1 con limit 2 => [Mov 5, Mov 4]
+    const firstPage = await repo.findByProductId(product.id, { page: 1, limit: 2 });
+    expect(firstPage.map((m) => m.reason)).toEqual(['Mov 5', 'Mov 4']);
+  });
 });

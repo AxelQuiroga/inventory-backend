@@ -2,7 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { RegisterStockEntry } from '../../application/movements/register-entry';
 import { RegisterStockExit } from '../../application/movements/register-exit';
 import { GetMovementHistory } from '../../application/movements/get-history';
-import { registerMovementSchema, movementParamsSchema } from '../schemas/movement-schema';
+import { registerMovementSchema, movementParamsSchema, movementHistoryQuerySchema } from '../schemas/movement-schema';
 
 export class MovementController {
   constructor(
@@ -71,10 +71,14 @@ export class MovementController {
     if (!params.success) {
       return reply.status(400).send({ message: 'Invalid params', errors: params.error.flatten() });
     }
+    const query = movementHistoryQuerySchema.safeParse(request.query ?? {});
+    if (!query.success) {
+      return reply.status(400).send({ message: 'Invalid query', errors: query.error.flatten() });
+    }
     const { productId } = params.data;
 
     try {
-      const history = await this.getHistoryUseCase.execute(productId);
+      const history = await this.getHistoryUseCase.execute(productId, query.data);
       return reply.send(history);
     } catch (error) {
       return reply.status(500).send({ message: 'Internal server error' });

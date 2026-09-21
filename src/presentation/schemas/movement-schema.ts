@@ -12,3 +12,12 @@ export type RegisterMovementInput = z.infer<typeof registerMovementSchema>
 export const movementParamsSchema = z.object({
   productId: z.string().uuid('Invalid product ID'),
 });
+
+// Query de GET /movements/history/:productId — paginación con defaults y cap,
+// coherente con productQuerySchema (page/limit).
+export const movementHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20),
+});
+
+export type MovementHistoryQuery = z.infer<typeof movementHistoryQuerySchema>;

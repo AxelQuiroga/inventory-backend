@@ -43,7 +43,7 @@ describe('GetMovementHistory', () => {
 
     const result = await useCase.execute('prod-1');
 
-    expect(movementRepository.findByProductId).toHaveBeenCalledWith('prod-1');
+    expect(movementRepository.findByProductId).toHaveBeenCalledWith('prod-1', {});
     expect(result).toHaveLength(2);
     expect(result[0]?.type).toBe(MovementType.IN);
     expect(result[1]?.type).toBe(MovementType.OUT);
@@ -55,5 +55,14 @@ describe('GetMovementHistory', () => {
     const result = await useCase.execute('prod-sin-movimientos');
 
     expect(result).toEqual([]);
+  });
+
+  it('reenvía las opciones de paginación al repositorio', async () => {
+    vi.mocked(movementRepository.findByProductId).mockResolvedValue(movements);
+
+    const result = await useCase.execute('prod-1', { page: 2, limit: 10 });
+
+    expect(movementRepository.findByProductId).toHaveBeenCalledWith('prod-1', { page: 2, limit: 10 });
+    expect(result).toHaveLength(2);
   });
 });

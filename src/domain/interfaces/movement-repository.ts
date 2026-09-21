@@ -18,6 +18,6 @@ export interface MovementFilters {
 export interface MovementRepository {
   createEntry(data: CreateMovementData): Promise<Movement>;
   createExit(data: CreateMovementData): Promise<Movement>;
-  findByProductId(productId: string): Promise<Movement[]>;
+  findByProductId(productId: string, options?: { page?: number; limit?: number }): Promise<Movement[]>;
   findAll(filters?: MovementFilters): Promise<Movement[]>;
 }

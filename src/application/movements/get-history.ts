@@ -4,7 +4,7 @@ import type { Movement } from '../../domain/entities/movement';
 export class GetMovementHistory {
   constructor(private movementRepository: MovementRepository) {}
 
-  async execute(productId: string): Promise<Movement[]> {
-    return this.movementRepository.findByProductId(productId);
+  async execute(productId: string, options: { page?: number; limit?: number } = {}): Promise<Movement[]> {
+    return this.movementRepository.findByProductId(productId, options);
   }
 }

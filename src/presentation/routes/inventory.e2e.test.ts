@@ -230,6 +230,46 @@ describe('INVENTORY E2E — entradas y salidas', () => {
     expect(history[1].type).toBe('OUT');
     expect(history[2].type).toBe('IN');
   });
+
+  it('el historial se pagina con limit y page (más reciente primero)', async () => {
+    const { id } = await createProductViaApi(app, adminToken);
+
+    for (let i = 1; i <= 5; i++) {
+      await app.inject({
+        method: 'POST',
+        url: '/movements/entry',
+        headers: authHeader(adminToken),
+        payload: { productId: id, quantity: i, reason: `Alta ${i}` },
+      });
+    }
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/movements/history/${id}?limit=2&page=2`,
+      headers: authHeader(adminToken),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const history = JSON.parse(res.body);
+    expect(history).toHaveLength(2);
+
+    // Más reciente primero: Alta 5, Alta 4, Alta 3, Alta 2, Alta 1
+    // página 2 con limit 2 => [Alta 3, Alta 2]
+    expect(history[0]?.reason).toBe('Alta 3');
+    expect(history[1]?.reason).toBe('Alta 2');
+  });
+
+  it('limit inválido en el historial devuelve 400', async () => {
+    const { id } = await createProductViaApi(app, adminToken);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/movements/history/${id}?limit=0`,
+      headers: authHeader(adminToken),
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
 });
 
 describe('AUDIT E2E — trazabilidad e inmutabilidad', () => {

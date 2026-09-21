@@ -108,12 +108,16 @@ export class DrizzleMovementRepository implements MovementRepository {
     });
   }
 
-  async findByProductId(productId: string): Promise<Movement[]> {
+  async findByProductId(productId: string, options?: { page?: number; limit?: number }): Promise<Movement[]> {
+    const { offset, limit } = this.buildPagination(options);
+
     const results = await db
       .select()
       .from(movements)
       .where(eq(movements.productId, productId))
-      .orderBy(desc(movements.createdAt));
+      .orderBy(desc(movements.createdAt))
+      .limit(limit)
+      .offset(offset);
 
     return results.map((r) => this.toDomain(r));
   }
@@ -143,9 +147,9 @@ export class DrizzleMovementRepository implements MovementRepository {
     };
   }
 
-  private buildPagination(filters?: MovementFilters) {
-    const limit = filters?.limit ?? 20;
-    const page = filters?.page ?? 1;
+  private buildPagination(options?: { page?: number; limit?: number }) {
+    const limit = options?.limit ?? 20;
+    const page = options?.page ?? 1;
     const offset = (page - 1) * limit;
     return { offset, limit };
   }
