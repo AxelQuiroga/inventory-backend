@@ -24,7 +24,12 @@ export class ProductController {
     }
 
     try {
-      const product = await this.createProductUseCase.execute(parsed.data);
+      // El movimiento de stock inicial queda a nombre del usuario autenticado
+      const user = request.user as { userId: string };
+      const product = await this.createProductUseCase.execute(parsed.data, {
+        initialStock: parsed.data.initialStock,
+        userId: user.userId,
+      });
       return reply.status(201).send(product);
     } catch (error) {
       return this.handleError(error, reply);

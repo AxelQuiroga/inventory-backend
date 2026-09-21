@@ -279,3 +279,99 @@ describe('PRODUCTS E2E — filtros', () => {
     expect(body).toHaveLength(2);
   });
 });
+
+describe('PRODUCTS E2E — creación con stock inicial', () => {
+  it('initialStock: 201 con stock cargado Y movimiento IN registrado (atómico)', async () => {
+    const sku = uniqueSku();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/products',
+      headers: authHeader(adminToken),
+      payload: {
+        name: 'Tornillo',
+        sku,
+        category: 'Ferretería',
+        unit: 'unit',
+        price: 1.5,
+        minStock: 100,
+        initialStock: 250,
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const product = JSON.parse(res.body);
+    expect(product.stock).toBe(250); // el stock llega con la creación
+
+    // El movimiento IN quedó registrado (trazabilidad del stock inicial)
+    const history = await app.inject({
+      method: 'GET',
+      url: `/movements/history/${product.id}`,
+      headers: authHeader(adminToken),
+    });
+    expect(history.statusCode).toBe(200);
+    const movements = JSON.parse(history.body);
+    expect(movements).toHaveLength(1);
+    expect(movements[0].type).toBe('IN');
+    expect(movements[0].quantity).toBe(250);
+    expect(movements[0].reason).toBe('Stock inicial');
+  });
+
+  it('initialStock 0 (o ausente): producto con stock 0 y SIN movimientos', async () => {
+    const sku = uniqueSku();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/products',
+      headers: authHeader(adminToken),
+      payload: { name: 'Sin stock', sku, category: 'E2E', unit: 'unit', price: 1, initialStock: 0 },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const product = JSON.parse(res.body);
+    expect(product.stock).toBe(0);
+
+    const history = await app.inject({
+      method: 'GET',
+      url: `/movements/history/${product.id}`,
+      headers: authHeader(adminToken),
+    });
+    expect(JSON.parse(history.body)).toHaveLength(0);
+  });
+
+  it('initialStock inválido (negativo o no entero): 400 y NO se crea el producto', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/products',
+      headers: authHeader(adminToken),
+      payload: {
+        name: 'Inválido', sku: uniqueSku(), category: 'E2E', unit: 'unit',
+        price: 1, initialStock: -3,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+
+    // El listado no contiene el producto: la validación falló antes de crear
+    const list = await app.inject({
+      method: 'GET',
+      url: '/products',
+      headers: authHeader(adminToken),
+    });
+    const names = JSON.parse(list.body).map((p: { name: string }) => p.name);
+    expect(names).not.toContain('Inválido');
+  });
+
+  it('OPERATOR no puede crear producto (ni con initialStock): 403', async () => {
+    const operatorToken = await login(creds.operator.email, creds.operator.password);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/products',
+      headers: authHeader(operatorToken),
+      payload: {
+        name: 'X', sku: uniqueSku(), category: 'E2E', unit: 'unit',
+        price: 1, initialStock: 5,
+      },
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+});

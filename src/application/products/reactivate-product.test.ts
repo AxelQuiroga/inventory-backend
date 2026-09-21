@@ -20,6 +20,7 @@ const product: Product = {
 
 const repository: ProductRepository = {
   create: vi.fn(),
+  createWithInitialStock: vi.fn(),
   findById: vi.fn(),
   findBySku: vi.fn(),
   findAll: vi.fn(),

@@ -11,6 +11,9 @@ export const createProductSchema = z.object({
   // movimiento IN (razón "Stock inicial"). Invariante: todo cambio de
   // stock genera un movimiento.
   minStock: z.number().int().min(0, 'Min stock cannot be negative').default(5),
+  // Stock inicial cargado en la creación: se materializa como un movimiento
+  // IN ("Stock inicial") en la MISMA transacción (nunca stock directo).
+  initialStock: z.number().int('Initial stock must be an integer').min(0, 'Initial stock cannot be negative').optional(),
 });
 
 export const updateProductSchema = z.object({

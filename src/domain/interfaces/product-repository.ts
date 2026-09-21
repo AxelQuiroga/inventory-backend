@@ -15,8 +15,17 @@ export interface ProductFilters {
 
 export type ProductCreateData = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'stock' | 'active'>;
 
+// Payload del método atómico: crea el producto y su stock inicial en una
+// única transacción (producto + movimiento IN "Stock inicial").
+export interface ProductWithInitialStock {
+  product: ProductCreateData;
+  initialStock: number;
+  userId: string;
+}
+
 export interface ProductRepository {
     create(data: ProductCreateData): Promise<Product>;
+    createWithInitialStock(data: ProductWithInitialStock): Promise<Product>;
     findById(id: string): Promise<Product | null>;
     findBySku(sku: string): Promise<Product | null>;
     findAll(filters?: ProductFilters): Promise<Product[]>;

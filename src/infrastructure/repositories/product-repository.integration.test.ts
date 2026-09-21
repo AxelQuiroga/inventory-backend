@@ -71,6 +71,60 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
     expect(history[0]?.reason).toBe('Stock inicial');
   });
 
+  it('12b. createWithInitialStock: crea producto con stock + movimiento IN en una transacción', async () => {
+    const user = await createUser();
+
+    const created = await repo.createWithInitialStock({
+      product: {
+        name: 'Tornillo',
+        description: '',
+        sku: 'TORN-001',
+        category: 'Ferretería',
+        unit: 'unit',
+        price: 1.5,
+        minStock: 100,
+      },
+      initialStock: 250,
+      userId: user.id,
+    });
+
+    // El producto nace CON su stock (y por debajo del mínimo: stock bajo real)
+    expect(created.stock).toBe(250);
+    expect(created.active).toBe(true);
+
+    // El movimiento quedó registrado con su usuario (trazabilidad)
+    const history = await movementRepo.findByProductId(created.id);
+    expect(history).toHaveLength(1);
+    expect(history[0]?.type).toBe('IN');
+    expect(history[0]?.quantity).toBe(250);
+    expect(history[0]?.reason).toBe('Stock inicial');
+    expect(history[0]?.userId).toBe(user.id);
+  });
+
+  it('12c. createWithInitialStock con userId inexistente: revierte TODO (no queda producto ni movimiento)', async () => {
+    const sku = 'TORN-FK-001';
+
+    await expect(
+      repo.createWithInitialStock({
+        product: {
+          name: 'Tornillo fantasma',
+          description: '',
+          sku,
+          category: 'Ferretería',
+          unit: 'unit',
+          price: 1.5,
+          minStock: 5,
+        },
+        initialStock: 10,
+        userId: '00000000-0000-0000-0000-000000000000',
+      }),
+    ).rejects.toThrow();
+
+    // Atomicidad: la inserción del producto se revirtió con la transacción
+    const orphan = await repo.findBySku(sku);
+    expect(orphan).toBeNull();
+  });
+
   it('13. desactivar (soft delete): conserva stock, historial y SKU; deja de aparecer en listados', async () => {
     const product = await repo.create({
       name: 'Silla',

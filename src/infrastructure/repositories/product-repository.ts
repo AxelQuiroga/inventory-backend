@@ -1,7 +1,8 @@
 import { eq, like, and, gte, lte, sql, asc, desc, ilike } from 'drizzle-orm';
 import { db } from '../database';
 import { products } from '../database/schema/products';
-import type { ProductRepository, ProductFilters, ProductCreateData } from '../../domain/interfaces/product-repository';
+import { movements } from '../database/schema/movements';
+import type { ProductRepository, ProductFilters, ProductCreateData, ProductWithInitialStock } from '../../domain/interfaces/product-repository';
 import type { Product } from '../../domain/entities/product';
 
 export class DrizzleProductRepository implements ProductRepository {
@@ -27,6 +28,41 @@ export class DrizzleProductRepository implements ProductRepository {
     }
 
     return this.toDomain(created);
+  }
+
+  // Creación atómica: producto + movimiento IN ("Stock inicial") en una
+  // única transacción. Si la inserción del movimiento falla (ej: userId
+  // inexistente), el producto NO queda creado. Invariante preservada:
+  // todo stock entra por un movimiento.
+  async createWithInitialStock(data: ProductWithInitialStock): Promise<Product> {
+    return db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(products)
+        .values({
+          name: data.product.name,
+          description: data.product.description,
+          sku: data.product.sku,
+          category: data.product.category,
+          unit: data.product.unit,
+          price: String(data.product.price),
+          minStock: data.product.minStock,
+        })
+        .returning();
+
+      if (!created) {
+        throw new Error('Failed to create product');
+      }
+
+      await tx.insert(movements).values({
+        productId: created.id,
+        userId: data.userId,
+        type: 'IN',
+        quantity: data.initialStock,
+        reason: 'Stock inicial',
+      });
+
+      return { ...this.toDomain(created), stock: data.initialStock };
+    });
   }
 
   async findById(id: string): Promise<Product | null> {

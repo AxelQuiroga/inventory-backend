@@ -20,6 +20,7 @@ const product: Product = {
 
 const repository: ProductRepository = {
   create: vi.fn(),
+  createWithInitialStock: vi.fn(),
   findById: vi.fn(),
   findBySku: vi.fn(),
   findAll: vi.fn(),
@@ -62,6 +63,62 @@ describe('CreateProduct', () => {
     expect(result).toEqual(product);
   });
 
+  it('con stock inicial > 0: delega en createWithInitialStock en un solo paso atómico', async () => {
+    vi.mocked(repository.findBySku).mockResolvedValue(null);
+    vi.mocked(repository.createWithInitialStock).mockResolvedValue({ ...product, stock: 10 });
+
+    const result = await useCase.execute(
+      {
+        name: 'Laptop',
+        description: 'Laptop 14"',
+        sku: 'LAP-001',
+        category: 'Electrónica',
+        unit: 'unit',
+        price: 899.99,
+        minStock: 5,
+      },
+      { initialStock: 10, userId: 'user-1' },
+    );
+
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(repository.createWithInitialStock).toHaveBeenCalledTimes(1);
+    expect(repository.createWithInitialStock).toHaveBeenCalledWith({
+      product: {
+        name: 'Laptop',
+        description: 'Laptop 14"',
+        sku: 'LAP-001',
+        category: 'Electrónica',
+        unit: 'unit',
+        price: 899.99,
+        minStock: 5,
+      },
+      initialStock: 10,
+      userId: 'user-1',
+    });
+    expect(result.stock).toBe(10);
+  });
+
+  it('con stock inicial 0 (o ausente): usa create y NO delega en el método atómico', async () => {
+    vi.mocked(repository.findBySku).mockResolvedValue(null);
+    vi.mocked(repository.create).mockResolvedValue(product);
+
+    await useCase.execute(
+      {
+        name: 'Laptop',
+        description: '',
+        sku: 'LAP-001',
+        category: 'Electrónica',
+        unit: 'unit',
+        price: 899.99,
+        minStock: 5,
+      },
+      { initialStock: 0, userId: 'user-1' },
+    );
+
+    expect(repository.create).toHaveBeenCalledTimes(1);
+    expect(repository.createWithInitialStock).not.toHaveBeenCalled();
+  });
+
   it('lanza error cuando el SKU ya existe', async () => {
     vi.mocked(repository.findBySku).mockResolvedValue(product);
 
@@ -78,5 +135,6 @@ describe('CreateProduct', () => {
     ).rejects.toThrow('SKU already exists');
 
     expect(repository.create).not.toHaveBeenCalled();
+    expect(repository.createWithInitialStock).not.toHaveBeenCalled();
   });
 });
