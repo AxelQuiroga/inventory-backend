@@ -47,6 +47,3 @@ temp/
 
 # Docker
 docker-compose.override.yml
-
-#IA AND ME
-PROJECT_CONTEXT.md
