@@ -22,6 +22,9 @@ export class AuthController {
       if (error instanceof Error && error.message === 'Invalid credentials') {
         return reply.status(401).send({ message: 'Invalid credentials' });
       }
+      if (error instanceof Error && error.message === 'User is deactivated') {
+        return reply.status(401).send({ message: 'User is deactivated' });
+      }
       return reply.status(500).send({ message: 'Internal server error' });
     }
   }

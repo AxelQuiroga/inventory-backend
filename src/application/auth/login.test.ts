@@ -11,6 +11,7 @@ const user: User = {
   password: bcrypt.hashSync('password123', 10),
   name: 'Admin',
   role: UserRole.ADMIN,
+  active: true,
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
 };
@@ -20,6 +21,7 @@ const userRepository: UserRepository = {
   findById: vi.fn(),
   findByEmail: vi.fn(),
   findAll: vi.fn(),
+  updateActive: vi.fn(),
 };
 
 const jwtService = new JwtService('test-secret');
@@ -55,6 +57,14 @@ describe('Login', () => {
 
     await expect(useCase.execute('nobody@example.com', 'password123')).rejects.toThrow(
       'Invalid credentials',
+    );
+  });
+
+  it('lanza error cuando la cuenta está desactivada (aunque la password sea válida)', async () => {
+    vi.mocked(userRepository.findByEmail).mockResolvedValue({ ...user, active: false });
+
+    await expect(useCase.execute('admin@example.com', 'password123')).rejects.toThrow(
+      'User is deactivated',
     );
   });
 });

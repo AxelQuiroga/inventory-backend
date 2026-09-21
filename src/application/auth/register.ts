@@ -23,6 +23,7 @@ export class Register {
       password: hashedPassword,
       name: data.name,
       role: data.role ?? UserRole.VIEWER,
+      active: true,
     });
 
     const { password: _, ...userWithoutPassword } = user;

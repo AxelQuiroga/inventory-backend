@@ -5,6 +5,7 @@ import { productRoutes } from './presentation/routes/product-routes';
 import { authRoutes } from './presentation/routes/auth-routes';
 import { movementRoutes } from './presentation/routes/movement-routes';
 import { saleRoutes } from './presentation/routes/sale-routes';
+import { userRoutes } from './presentation/routes/user-routes';
 
 // Factory de la aplicación: separada del bootstrap (index.ts) para que los
 // tests HTTP puedan construir la app con app.inject() sin levantar el server.
@@ -20,6 +21,7 @@ export function buildApp() {
   app.register(movementRoutes);
   app.register(productRoutes);
   app.register(saleRoutes);
+  app.register(userRoutes);
 
   app.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };

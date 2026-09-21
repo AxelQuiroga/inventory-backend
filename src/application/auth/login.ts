@@ -19,6 +19,13 @@ export class Login {
       throw new Error('Invalid credentials');
     }
 
+    // Cuenta desactivada (soft-disable): no puede iniciar sesión, pero su
+    // historial queda intacto. El mensaje se emite solo con credenciales
+    // válidas para no filtrar el estado de la cuenta a terceros.
+    if (!user.active) {
+      throw new Error('User is deactivated');
+    }
+
     const token = this.jwtService.sign({
       userId: user.id,
       email: user.email,

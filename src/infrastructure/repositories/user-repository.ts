@@ -14,6 +14,7 @@ export class DrizzleUserRepository implements UserRepository {
         password: data.password,
         name: data.name,
         role: data.role,
+        active: data.active,
       })
       .returning();
 
@@ -47,6 +48,16 @@ export class DrizzleUserRepository implements UserRepository {
     return results.map((r) => this.toDomain(r));
   }
 
+  async updateActive(id: string, active: boolean): Promise<User | null> {
+    const [updated] = await db
+      .update(users)
+      .set({ active, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+
+    return updated ? this.toDomain(updated) : null;
+  }
+
   private toDomain(row: typeof users.$inferSelect): User {
     return {
       id: row.id,
@@ -54,6 +65,7 @@ export class DrizzleUserRepository implements UserRepository {
       password: row.password,
       name: row.name,
       role: row.role as User['role'],
+      active: row.active,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };

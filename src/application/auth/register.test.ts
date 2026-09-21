@@ -10,6 +10,7 @@ const existingUser: User = {
   password: bcrypt.hashSync('password123', 10),
   name: 'Existente',
   role: UserRole.VIEWER,
+  active: true,
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
 };
@@ -30,6 +31,7 @@ const userRepository: UserRepository = {
   findById: vi.fn(),
   findByEmail: vi.fn(),
   findAll: vi.fn(),
+  updateActive: vi.fn(),
 };
 
 const useCase = new Register(userRepository);
@@ -51,6 +53,7 @@ describe('Register', () => {
 
     expect(userRepository.create).toHaveBeenCalledTimes(1);
     expect(savedData?.role).toBe('VIEWER');
+    expect(savedData?.active).toBe(true);
     expect(savedData?.email).toBe('new@example.com');
     expect(savedData?.password).not.toBe('password123');
     expect(bcrypt.compareSync('password123', savedData!.password)).toBe(true);

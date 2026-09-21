@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
+import { inArray } from 'drizzle-orm';
 import { testDb, testPool, closeTestDb } from './test-db';
 import { resetTestDb, verifyTestDbIsReady } from './test-utils';
 import { users, UserRole } from './schema/users';
@@ -24,15 +25,22 @@ export async function closeE2eApp(app: FastifyInstance) {
   await closeTestDb();
 }
 
+export interface E2eUser {
+  id: string;
+  email: string;
+  password: string;
+}
+
 export interface E2eCredentials {
-  admin: { email: string; password: string };
-  operator: { email: string; password: string };
-  viewer: { email: string; password: string };
+  admin: E2eUser;
+  operator: E2eUser;
+  viewer: E2eUser;
 }
 
 // Resetea la test DB y deja creados los tres usuarios con contraseñas
 // hasheadas (bcrypt real). Un solo set compartido por archivo: cada test se
-// aísla con sus propios datos (SKUs/emails únicos).
+// aísla con sus propios datos (SKUs/emails únicos). Incluye los ids para que
+// los tests de gestión de usuarios puedan apuntar a cuentas reales.
 export async function resetE2eDb(): Promise<E2eCredentials> {
   await resetTestDb();
 
@@ -46,10 +54,34 @@ export async function resetE2eDb(): Promise<E2eCredentials> {
     ])
     .onConflictDoNothing();
 
+  const rows = await testDb
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(
+      inArray(users.email, [
+        'admin@inventory.com',
+        'operator@inventory.com',
+        'viewer@inventory.com',
+      ]),
+    );
+  const byEmail = new Map(rows.map((r) => [r.email, r.id]));
+
   return {
-    admin: { email: 'admin@inventory.com', password: 'admin123' },
-    operator: { email: 'operator@inventory.com', password: 'admin123' },
-    viewer: { email: 'viewer@inventory.com', password: 'admin123' },
+    admin: {
+      id: byEmail.get('admin@inventory.com')!,
+      email: 'admin@inventory.com',
+      password: 'admin123',
+    },
+    operator: {
+      id: byEmail.get('operator@inventory.com')!,
+      email: 'operator@inventory.com',
+      password: 'admin123',
+    },
+    viewer: {
+      id: byEmail.get('viewer@inventory.com')!,
+      email: 'viewer@inventory.com',
+      password: 'admin123',
+    },
   };
 }
 
