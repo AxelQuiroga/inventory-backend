@@ -1,5 +1,6 @@
 import { eq, and, gte, sql, desc, inArray } from 'drizzle-orm';
 import { db } from '../database';
+import { expectOne } from '../database/rows';
 import { sales, saleItems } from '../database/schema/sales';
 import { movements } from '../database/schema/movements';
 import { products } from '../database/schema/products';
@@ -12,11 +13,13 @@ import type { Sale, SaleItem, SaleSummary } from '../../domain/entities/sale';
 export class DrizzleSaleRepository implements SaleRepository {
   async createWithItems(data: CreateSaleData): Promise<Sale> {
     return db.transaction(async (tx) => {
-      // 1. Cabeza de la venta (sin total: es derivado)
-      const [sale] = await tx.insert(sales).values({ userId: data.userId }).returning();
-      if (!sale) {
-        throw new Error('Failed to create sale');
-      }
+      // 1. Cabeza de la venta (sin total: es derivado). INSERT ... RETURNING
+      //    en Postgres siempre devuelve la fila insertada: expectOne restaura
+      //    esa cardinalidad que Drizzle tipa como T[].
+      const sale = expectOne(
+        await tx.insert(sales).values({ userId: data.userId }).returning(),
+        'sale',
+      );
 
       const items: SaleItem[] = [];
       for (const line of data.items) {
@@ -34,7 +37,7 @@ export class DrizzleSaleRepository implements SaleRepository {
             eq(products.active, true),
             gte(products.stock, line.quantity),
           ))
-          .returning({ id: products.id });
+          .returning({ id: products.id, price: products.price });
 
         if (!updated) {
           // 3. Diagnóstico: 404 (no existe) vs 400 (inactivo) vs 400 (sin stock)
@@ -53,23 +56,24 @@ export class DrizzleSaleRepository implements SaleRepository {
         }
 
         // 4. Precio ACTUAL del producto: se congela en la línea. Si mañana
-        //    el producto sube, las ventas históricas no cambian.
-        const [current] = await tx
-          .select({ price: products.price })
-          .from(products)
-          .where(eq(products.id, line.productId));
-        const unitPrice = Number(current.price);
+        //    el producto sube, las ventas históricas no cambian. El precio
+        //    sale del MISMO UPDATE atómico (la fila ya está bajo row lock):
+        //    una sola query por línea, sin round-trip redundante.
+        const unitPrice = Number(updated.price);
 
         // 5. Ítem de la venta
-        const [item] = await tx
-          .insert(saleItems)
-          .values({
-            saleId: sale.id,
-            productId: line.productId,
-            quantity: line.quantity,
-            unitPrice: String(unitPrice),
-          })
-          .returning();
+        const item = expectOne(
+          await tx
+            .insert(saleItems)
+            .values({
+              saleId: sale.id,
+              productId: line.productId,
+              quantity: line.quantity,
+              unitPrice: String(unitPrice),
+            })
+            .returning(),
+          'sale item',
+        );
 
         // 6. Movimiento OUT con trazabilidad de la venta (historial del
         //    producto muestra la salida; saleId conecta con la venta)

@@ -29,6 +29,14 @@ async function expectStock(productId: string, expected: number) {
   expect(Number(rows[0].stock)).toBe(expected);
 }
 
+// Assertion function de TypeScript: el assert corre en runtime Y estrecha el
+// tipo en compile-time. Con noUncheckedIndexedAccess, findById devuelve
+// Sale | null; esto permite acceder después sin `!` ni supresiones.
+function expectSome<T>(value: T | null | undefined): asserts value is T {
+  expect(value).not.toBeNull();
+  expect(value).not.toBeUndefined();
+}
+
 describe('DrizzleSaleRepository (integración real con PostgreSQL)', () => {
   it('1. venta multi-línea: descuenta stock, congela el precio actual y deja movimientos OUT', async () => {
     const user = await createUser();
@@ -44,10 +52,10 @@ describe('DrizzleSaleRepository (integración real con PostgreSQL)', () => {
     });
 
     expect(sale.items).toHaveLength(2);
-    expect(sale.items[0].unitPrice).toBe(100);
-    expect(sale.items[0].total).toBe(500);
-    expect(sale.items[1].unitPrice).toBe(50.5);
-    expect(sale.items[1].total).toBe(101);
+    // Sin acceso indexado: noUncheckedIndexedAccess tiparía items[0] como
+    // undefined. map() evita la indexación y el assert es más expresivo.
+    expect(sale.items.map((item) => item.unitPrice)).toEqual([100, 50.5]);
+    expect(sale.items.map((item) => item.total)).toEqual([500, 101]);
     expect(sale.total).toBe(601);
 
     await expectStock(a.id, 15);
@@ -135,12 +143,12 @@ describe('DrizzleSaleRepository (integración real con PostgreSQL)', () => {
     });
 
     const sale = await repo.findById(created.id);
-    expect(sale).not.toBeNull();
-    expect(sale!.items).toHaveLength(1);
-    expect(sale!.items[0].productName).toBe(a.name);
-    expect(sale!.items[0].productSku).toBe(a.sku);
-    expect(sale!.items[0].total).toBe(240);
-    expect(sale!.total).toBe(240);
+    expectSome(sale);
+    expect(sale.items).toHaveLength(1);
+    expect(sale.items.map((item) => item.productName)).toEqual([a.name]);
+    expect(sale.items.map((item) => item.productSku)).toEqual([a.sku]);
+    expect(sale.items.map((item) => item.total)).toEqual([240]);
+    expect(sale.total).toBe(240);
   });
 
   it('6. findAll agrupa resúmenes con total e itemCount', async () => {
@@ -158,8 +166,8 @@ describe('DrizzleSaleRepository (integración real con PostgreSQL)', () => {
 
     const list = await repo.findAll();
     expect(list).toHaveLength(1);
-    expect(list[0].id).toBe(sale.id);
-    expect(list[0].itemCount).toBe(2);
-    expect(list[0].total).toBe(40);
+    expect(list.map((s) => s.id)).toEqual([sale.id]);
+    expect(list.map((s) => s.itemCount)).toEqual([2]);
+    expect(list.map((s) => s.total)).toEqual([40]);
   });
 });
