@@ -441,3 +441,121 @@ describe('ATOMICIDAD E2E — stock y movements consistentes', () => {
     expect(await countMovements(id)).toBe(1);
   });
 });
+
+describe('GLOBAL MOVEMENTS E2E — GET /movements y política de visibilidad', () => {
+  it('ADMIN ve la vista global con producto unido y autoría (userName)', async () => {
+    const { id } = await createProductViaApi(app, adminToken);
+    await app.inject({
+      method: 'POST',
+      url: '/movements/entry',
+      headers: authHeader(adminToken),
+      payload: { productId: id, quantity: 30, reason: 'Compra' },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/movements',
+      headers: authHeader(adminToken),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const movements = JSON.parse(res.body);
+    expect(movements).toHaveLength(1);
+    expect(movements[0].productId).toBe(id);
+    expect(movements[0].productSku).toBeTruthy();
+    expect(movements[0].productName).toBeTruthy();
+    // La autoría es dato del ADMIN: el nombre del usuario operador llega.
+    expect(movements[0].userName).toBe('Admin');
+  });
+
+  it('OPERATOR y VIEWER ven los movimientos pero SIN autoría (userName null)', async () => {
+    const { id } = await createProductViaApi(app, adminToken);
+    await app.inject({
+      method: 'POST',
+      url: '/movements/entry',
+      headers: authHeader(adminToken),
+      payload: { productId: id, quantity: 10, reason: 'Stock inicial' },
+    });
+
+    for (const token of [operatorToken, await login(creds.viewer.email, creds.viewer.password)]) {
+      const res = await app.inject({ method: 'GET', url: '/movements', headers: authHeader(token) });
+
+      expect(res.statusCode).toBe(200);
+      const movements = JSON.parse(res.body);
+      expect(movements).toHaveLength(1);
+      expect(movements[0].productSku).toBeTruthy(); // el producto sí viaja
+      expect(movements[0].userId).toBeNull();
+      expect(movements[0].userName).toBeNull(); // la autoría se redacta
+    }
+  });
+
+  it('OPERATOR que manda ?userId= NO puede filtrar por autor (se ignora)', async () => {
+    const { id } = await createProductViaApi(app, adminToken);
+    // 2 movimientos del admin para tener volumen
+    await app.inject({
+      method: 'POST',
+      url: '/movements/entry',
+      headers: authHeader(adminToken),
+      payload: { productId: id, quantity: 10, reason: 'Alta 1' },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/movements/entry',
+      headers: authHeader(adminToken),
+      payload: { productId: id, quantity: 5, reason: 'Alta 2' },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/movements?userId=${creds.admin.id}`,
+      headers: authHeader(operatorToken),
+    });
+
+    expect(res.statusCode).toBe(200);
+    // El filtro de autor se descartó: llegan los 2 movimientos, no 0.
+    expect(JSON.parse(res.body)).toHaveLength(2);
+  });
+
+  it('los filtros type/productId funcionan para ADMIN', async () => {
+    const { id } = await createProductViaApi(app, adminToken);
+    await app.inject({
+      method: 'POST',
+      url: '/movements/entry',
+      headers: authHeader(adminToken),
+      payload: { productId: id, quantity: 10, reason: 'Entrada' },
+    });
+
+    const ins = await app.inject({
+      method: 'GET',
+      url: '/movements?type=IN',
+      headers: authHeader(adminToken),
+    });
+    expect(JSON.parse(ins.body)).toHaveLength(1);
+
+    const outs = await app.inject({
+      method: 'GET',
+      url: '/movements?type=OUT',
+      headers: authHeader(adminToken),
+    });
+    expect(JSON.parse(outs.body)).toHaveLength(0);
+
+    const byProduct = await app.inject({
+      method: 'GET',
+      url: `/movements?productId=${id}`,
+      headers: authHeader(adminToken),
+    });
+    expect(JSON.parse(byProduct.body)).toHaveLength(1);
+  });
+
+  it('sin token: 401; query inválida: 400', async () => {
+    const noToken = await app.inject({ method: 'GET', url: '/movements' });
+    expect(noToken.statusCode).toBe(401);
+
+    const badQuery = await app.inject({
+      method: 'GET',
+      url: '/movements?limit=0',
+      headers: authHeader(adminToken),
+    });
+    expect(badQuery.statusCode).toBe(400);
+  });
+});

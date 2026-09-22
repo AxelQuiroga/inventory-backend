@@ -28,7 +28,7 @@ const movementRepository: MovementRepository = {
   createEntry: vi.fn(),
   createExit: vi.fn(),
   findByProductId: vi.fn(),
-  findAll: vi.fn(),
+  findGlobal: vi.fn(),
 };
 
 const useCase = new GetMovementHistory(movementRepository);

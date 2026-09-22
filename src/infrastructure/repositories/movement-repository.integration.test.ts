@@ -9,7 +9,8 @@ vi.mock('../database', async () => {
 
 import { DrizzleMovementRepository } from './movement-repository';
 import { verifyTestDbIsReady, resetTestDb, createUser, createProduct } from '../database/test-utils';
-import { closeTestDb, testPool } from '../database/test-db';
+import { closeTestDb, testPool, testDb } from '../database/test-db';
+import { users, UserRole } from '../database/schema/users';
 import { MovementType } from '../../domain/entities/movement';
 
 const repo = new DrizzleMovementRepository();
@@ -240,5 +241,126 @@ describe('DrizzleMovementRepository (integración real con PostgreSQL)', () => {
     // Página 1 con limit 2 => [Mov 5, Mov 4]
     const firstPage = await repo.findByProductId(product.id, { page: 1, limit: 2 });
     expect(firstPage.map((m) => m.reason)).toEqual(['Mov 5', 'Mov 4']);
+  });
+});
+
+describe('DrizzleMovementRepository.findGlobal (vista global con joins)', () => {
+  // Fixtures con nombres DISTINTOS para probar el join a users y products.
+  async function seedGlobalData() {
+    const product = await createProduct({ name: 'Martillo', sku: 'MAR-1' });
+    const user = await testDb
+      .insert(users)
+      .values({
+        email: `global-${randomUUID()}@test.local`,
+        password: 'not-used-in-tests',
+        name: 'Axel Admin',
+        role: UserRole.ADMIN,
+      })
+      .returning();
+    if (!user[0]) throw new Error('Failed to create global test user');
+
+    const entry = await repo.createEntry({
+      productId: product.id,
+      userId: user[0].id,
+      quantity: 10,
+      reason: 'Stock inicial',
+    });
+    const exit = await repo.createExit({
+      productId: product.id,
+      userId: user[0].id,
+      quantity: 4,
+      reason: 'Venta',
+    });
+
+    return { product, user: user[0], entry, exit };
+  }
+
+  it('join a products: expone sku y nombre del producto sin autoría (includeUser=false)', async () => {
+    const { product } = await seedGlobalData();
+
+    const all = await repo.findGlobal({}, { includeUser: false });
+
+    expect(all).toHaveLength(2);
+    const first = all[0]!;
+    expect(first.productId).toBe(product.id);
+    expect(first.productSku).toBe('MAR-1');
+    expect(first.productName).toBe('Martillo');
+    // Redacción estructural: el dato de autoría NO viaja sin permiso.
+    expect(first.userId).toBeNull();
+    expect(first.userName).toBeNull();
+  });
+
+  it('includeUser=true: une users y expone userId + userName reales', async () => {
+    const { user } = await seedGlobalData();
+
+    const all = await repo.findGlobal({}, { includeUser: true });
+
+    expect(all).toHaveLength(2);
+    for (const m of all) {
+      expect(m.userId).toBe(user.id);
+      expect(m.userName).toBe('Axel Admin');
+    }
+  });
+
+  it('filtra por type (IN/OUT)', async () => {
+    const { entry, exit } = await seedGlobalData();
+
+    const ins = await repo.findGlobal({ type: 'IN' }, { includeUser: false });
+    expect(ins.map((m) => m.id)).toEqual([entry.id]);
+
+    const outs = await repo.findGlobal({ type: 'OUT' }, { includeUser: false });
+    expect(outs.map((m) => m.id)).toEqual([exit.id]);
+  });
+
+  it('filtra por productId', async () => {
+    const { product, entry, exit } = await seedGlobalData();
+    // Un segundo producto con su propio movimiento: si el filtro no aplicara,
+    // este movimiento contaminaría el resultado.
+    const otherProduct = await createProduct({ name: 'Taladro', sku: 'TAL-1' });
+    await repo.createEntry({
+      productId: otherProduct.id,
+      userId: entry.userId,
+      quantity: 1,
+      reason: 'Ajeno',
+    });
+
+    const filtered = await repo.findGlobal({ productId: product.id }, { includeUser: false });
+    expect(filtered.map((m) => m.id)).toEqual(expect.arrayContaining([entry.id, exit.id]));
+    expect(filtered).toHaveLength(2);
+  });
+
+  it('filtra por userId SOLO con includeUser; sin autoría lo ignora', async () => {
+    const { user, entry, exit } = await seedGlobalData();
+    // Otro usuario con sus propios movimientos: debe quedar fuera del filtro.
+    const otherUser = await createUser();
+    await repo.createEntry({
+      productId: entry.productId,
+      userId: otherUser.id,
+      quantity: 1,
+      reason: 'De otro',
+    });
+
+    const filtered = await repo.findGlobal({ userId: user.id }, { includeUser: true });
+    expect(filtered.map((m) => m.id)).toEqual(expect.arrayContaining([entry.id, exit.id]));
+    expect(filtered).toHaveLength(2);
+
+    // Sin permiso de autoría, un userId en los filtros NO condiciona la query:
+    // devuelve todo (no filtra por un autor invisible).
+    const guarded = await repo.findGlobal({ userId: user.id }, { includeUser: false });
+    expect(guarded).toHaveLength(3);
+    expect(guarded.map((m) => m.id)).toEqual(expect.arrayContaining([entry.id, exit.id]));
+  });
+
+  it('pagina con limit/page y ordena más reciente primero', async () => {
+    const { product, user } = await seedGlobalData();
+    for (let i = 1; i <= 3; i++) {
+      await repo.createEntry({ productId: product.id, userId: user.id, quantity: i, reason: `Extra ${i}` });
+    }
+
+    const page2 = await repo.findGlobal({ limit: 2, page: 2 }, { includeUser: false });
+    expect(page2).toHaveLength(2);
+    // 5 movs ordenados desc: Extra 3, Extra 2, Extra 1, exit, entry → página 2 = [Extra 1, exit]
+    expect(page2[0]!.reason).toBe('Extra 1');
+    expect(page2[1]!.reason).toBe('Venta');
   });
 });

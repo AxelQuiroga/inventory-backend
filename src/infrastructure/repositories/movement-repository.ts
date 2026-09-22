@@ -2,8 +2,9 @@ import { eq, desc, and, gte, sql } from 'drizzle-orm';
 import { db } from '../database';
 import { movements } from '../database/schema/movements';
 import { products } from '../database/schema/products';
+import { users } from '../database/schema/users';
 import type { MovementRepository, CreateMovementData, MovementFilters } from '../../domain/interfaces/movement-repository';
-import type { Movement } from '../../domain/entities/movement';
+import type { Movement, GlobalMovement } from '../../domain/entities/movement';
 
 export class DrizzleMovementRepository implements MovementRepository {
 
@@ -122,17 +123,90 @@ export class DrizzleMovementRepository implements MovementRepository {
     return results.map((r) => this.toDomain(r));
   }
 
-  async findAll(filters?: MovementFilters): Promise<Movement[]> {
+  async findGlobal(filters: MovementFilters = {}, options: { includeUser?: boolean } = {}): Promise<GlobalMovement[]> {
     const { offset, limit } = this.buildPagination(filters);
 
+    // Filtros del contrato: type/productId para todos; userId SOLO cuando la
+    // consulta pide la autoría (un rol que no ve autores no filtra por uno).
+    const conditions = [];
+    if (filters.type) conditions.push(eq(movements.type, filters.type));
+    if (filters.productId) conditions.push(eq(movements.productId, filters.productId));
+    if (options.includeUser && filters.userId) conditions.push(eq(movements.userId, filters.userId));
+    // and() con lista vacía devuelve undefined (sin WHERE): válido en drizzle.
+    const where = and(...conditions);
+
+    // El join a users es CONDICIONAL a includeUser: para OPERATOR/VIEWER la
+    // query ni siquiera toca la tabla users — el dato no se lee del motor.
+    if (options.includeUser) {
+      const results = await db
+        .select({
+          id: movements.id,
+          productId: movements.productId,
+          productSku: products.sku,
+          productName: products.name,
+          type: movements.type,
+          quantity: movements.quantity,
+          reason: movements.reason,
+          createdAt: movements.createdAt,
+          userId: movements.userId,
+          userName: users.name,
+        })
+        .from(movements)
+        .innerJoin(products, eq(movements.productId, products.id))
+        .innerJoin(users, eq(movements.userId, users.id))
+        .where(where)
+        .orderBy(desc(movements.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      return results.map((r) => ({
+        id: r.id,
+        productId: r.productId,
+        productSku: r.productSku,
+        productName: r.productName,
+        userId: r.userId,
+        userName: r.userName,
+        type: r.type as Movement['type'],
+        quantity: r.quantity,
+        reason: r.reason,
+        createdAt: r.createdAt,
+      }));
+    }
+
+    // Sin autoría: NULL literal en los campos de autor (redacción estructural:
+    // el dato no viaja ni como columna proyectada).
     const results = await db
-      .select()
+      .select({
+        id: movements.id,
+        productId: movements.productId,
+        productSku: products.sku,
+        productName: products.name,
+        type: movements.type,
+        quantity: movements.quantity,
+        reason: movements.reason,
+        createdAt: movements.createdAt,
+        userId: sql<null>`NULL`,
+        userName: sql<null>`NULL`,
+      })
       .from(movements)
+      .innerJoin(products, eq(movements.productId, products.id))
+      .where(where)
       .orderBy(desc(movements.createdAt))
       .limit(limit)
       .offset(offset);
 
-    return results.map((r) => this.toDomain(r));
+    return results.map((r) => ({
+      id: r.id,
+      productId: r.productId,
+      productSku: r.productSku,
+      productName: r.productName,
+      userId: r.userId,
+      userName: r.userName,
+      type: r.type as Movement['type'],
+      quantity: r.quantity,
+      reason: r.reason,
+      createdAt: r.createdAt,
+    }));
   }
 
   private toDomain(row: typeof movements.$inferSelect): Movement {
