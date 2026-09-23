@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import type { UserRepository } from '../../domain/interfaces/user-repository';
-import type { JwtService } from '../../infrastructure/auth/jwt-service';
+import type { TokenGateway } from '../../domain/interfaces/token-gateway';
 import { InvalidCredentialsError, AccountDeactivatedError } from '../../domain/auth-errors';
 
 // Hash bcrypt PRECOMPUTADO de un password fantasma (cost 12, el MISMO de
@@ -15,7 +15,7 @@ const DUMMY_PASSWORD_HASH =
 export class Login {
   constructor(
     private userRepository: UserRepository,
-    private jwtService: JwtService,
+    private tokenGateway: TokenGateway,
   ) {}
 
   async execute(email: string, password: string): Promise<string> {
@@ -36,7 +36,7 @@ export class Login {
       throw new AccountDeactivatedError();
     }
 
-    const token = this.jwtService.sign({
+    const token = this.tokenGateway.sign({
       userId: user.id,
       email: user.email,
       role: user.role,
