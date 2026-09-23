@@ -789,6 +789,107 @@ sino:
 
 > **"¿Qué problema estamos resolviendo y cuál es la forma más simple, correcta y mantenible de resolverlo?"**
 
+---
+
+# 19. Decisiones de seguridad — Fase 2
+
+Decisiones tomadas tras una auditoría de seguridad del stack completo. Cada una
+responde a un hallazgo concreto y documenta el porqué, para que no se reviertan
+por accidente ni se repitan los errores.
+
+## 19.1 Timing attack en login — dummy hash (A+G+H)
+
+**Hallazgo**: `login.ts` devolvía `Invalid credentials` SIN ejecutar bcrypt
+cuando el email no existía. La latencia de respuesta distinguía "email
+registrado" de "email inexistente" → enumeración de cuentas por timing side
+channel.
+
+**Solución**: `bcrypt.compare` se ejecuta SIEMPRE. Con email inexistente se
+compara contra un hash dummy **precomputado** con el MISMO costo de producción
+(`$2b$12$`). Precomputado = cero costo al boot, y si el costo cambia en el
+futuro, el dummy debe regenerarse con el mismo costo (protegido por test:
+assert del prefijo `$2b$12$` en `login.test.ts`).
+
+## 19.2 Errores tipados de dominio (G)
+
+**Hallazgo**: el controller distinguía errores por `error.message === '...'` →
+cambiar el texto de un error rompía el contrato HTTP en silencio.
+
+**Solución**: `DomainError` + subclases (`InvalidCredentialsError`,
+`AccountDeactivatedError`, `EmailAlreadyRegisteredError`) en
+`src/domain/auth-errors.ts`. El controller mapea con `instanceof`. Mensajes
+centralizados en las clases.
+
+**Decisión de producto (explícitamente pedida)**:
+- `Invalid credentials` — mismo mensaje para email inexistente y password mala
+  (no filtrar qué emails existen).
+- `User is deactivated` — mensaje DISTINTO a propósito: solo se emite cuando la
+  password YA fue válida, así que solo lo ve alguien que conoce las
+  credenciales. UX real > ocultación marginal.
+
+## 19.3 bcrypt costo 12 (H)
+
+`BCRYPT_ROUNDS = 12` vive en `src/domain/auth.ts` y lo comparten registro,
+seed y el reset de la TEST DB. Costo único = si el dummy hash del timing attack
+tuviera otro costo, la protección se caería por un side channel. Migración de
+hashes viejos = password reset, no re-hash automático.
+
+## 19.4 JWT unificado — jsonwebtoken only (E)
+
+**Hallazgo**: DOS librerías JWT (`jsonwebtoken` firmaba, `@fastify/jwt`
+verificaba) → dos codificaciones, dos superficies, secretos mal tipados
+(`JWT_SECRET!`).
+
+**Solución**: un solo `JwtService` (jsonwebtoken) decorado en la instancia
+(types en `src/types/fastify.d.ts`). `JWT_SECRET` validado por Zod: mínimo 32
+chars, requerido (sin `!` en el código). Se eliminó `@fastify/jwt`.
+
+## 19.5 Rate limit en login (B)
+
+**Hallazgo**: `/auth/login` (único endpoint público con bcrypt cost 12) sin
+protección → fuerza bruta ilimitada.
+
+**Solución**: `@fastify/rate-limit` con `global: false`, aplicado SOLO a
+`POST /auth/login` (marcado por config de ruta): `RATE_LIMIT_MAX` (default 10)
+requests por IP en ventana de 15 minutos → 429. Los endpoints autenticados NO
+tienen rate limit por IP (los protege la auth). Configurable por env
+(`RATE_LIMIT_ENABLED`, `RATE_LIMIT_MAX`); los tests e2e lo desactivan
+(`test-e2e-env.ts`) porque ejecutan muchos logins en secuencia. El comportamiento
+se cubre con un integration test dedicado (env con max chico).
+
+## 19.6 CORS allowlist (C)
+
+**Hallazgo**: `app.register(cors)` sin opciones → reflejaba CUALQUIER origin.
+
+**Solución**: allowlist desde env `CORS_ORIGINS` (dev frontend 5173, e2e 4310).
+Métodos y headers explícitos (`Content-Type`, `Authorization`). Test de
+contrato: origin permitido → echo; foráneo → sin header CORS; preflight → 204
+con allow-methods/headers. Con `Authorization` header (no cookies) el riesgo
+real era bajo, pero un CORS abierto es una bomba de tiempo.
+
+## 19.7 Sesión del frontend — localStorage (F)
+
+**Hallazgo**: el token JWT se guarda en `localStorage` (tokenStore.ts).
+
+**Análisis**: los dos riesgos clásicos de localStorage son XSS y robo vía
+extensiones maliciosas. La auditoría de XSS del frontend dio **cero surfaces**
+(grep de `dangerouslySetInnerHTML`, `innerHTML`, `eval`, `document.write`: sin
+matches) y React escapa HTML por defecto. El sistema NO usa cookies: bearer
+token con `Authorization` header, así que no hay riesgo de CSRF. El trade-off
+de cookies httpOnly (más seguro contra XSS) trae CSRF + doble token +
+cross-site infraestructura — complejidad neta negativa para el tamaño del
+sistema.
+
+**Decisión**: se MANTIENE localStorage, con las mitigaciones ya presentes:
+- 401 global → limpieza de sesión + redirect a `/login` (token expirado o
+  inválido no deja al usuario "atrapado").
+- El token se elimina en logout explícito.
+
+**Cuándo revisitarlo**: si el frontend alguna vez necesita renderizar HTML sin
+escape (rich text, markdown) o crece el equipo/la superficie, migrar a cookies
+httpOnly + SameSite y reconsiderar. Hasta esa fecha, localStorage es la
+decisión simple y correcta para este sistema.
+
 {
   "email": "admin@inventory.com",
   "password": "admin123"
