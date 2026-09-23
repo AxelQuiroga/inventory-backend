@@ -75,7 +75,7 @@ La lógica de negocio no debería depender directamente de Fastify ni de Postgre
 * Consultar productos.
 * Buscar y filtrar productos.
 * Actualizar información de productos.
-* **Nota:** la "desactivación lógica" (soft-delete) está pendiente de decisión — hoy `DELETE /products/:id` elimina físicamente; la Regla 7 del diseño prefiere desactivación lógica.
+* Desactivación lógica (`POST /products/:id/deactivate` + `reactivate`) — la Regla 7 del dominio prefiere desactivar antes que eliminar, preservando el historial.
 * Consultar productos con stock bajo.
 
 ### Inventario
@@ -203,13 +203,17 @@ docker compose down
 
 Las credenciales y configuraciones sensibles no deben almacenarse en el repositorio.
 
-Ejemplo:
+Copiar `cp .env.example .env` y completar. La app valida el env al boot
+(envSchema en `src/config/env.ts`) y **no arranca** con configuración inválida:
 
 ```env
-PORT=3000
-DATABASE_URL=
-JWT_SECRET=
 NODE_ENV=development
+PORT=3000
+JWT_SECRET=                  # mínimo 32 caracteres
+DATABASE_URL=                # postgresql://user:pass@host:5432/db
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_MAX=10
 ```
 
 El archivo `.env` debe permanecer fuera del control de versiones.
@@ -224,16 +228,17 @@ El archivo `.env` debe permanecer fuera del control de versiones.
 * [X] Implementar productos.
 * [X] Implementar movimientos de inventario.
 * [X] Implementar autenticación.
-* [~] Implementar autorización — base lista (`authenticate` + `authorize`), falta definir la matriz de permisos por rol en cada ruta.
+* [X] Implementar autorización — `authenticate` (JWT) + `authorize('ADMIN' | 'OPERATOR')` por ruta.
 * [X] Agregar validaciones.
 * [X] Agregar manejo de errores.
-* [X] Implementar tests (unit — capa application).
-* [ ] Tests de integración (PostgreSQL real — las reglas críticas del stock).
+* [X] Implementar tests unit (capa application).
+* [X] Tests de integración (PostgreSQL real — las reglas críticas del stock) y e2e de API.
+* [X] Endurecer seguridad (env Zod, JWT único, login timing-safe, bcrypt 12, rate limit, CORS allowlist).
 * [ ] Dockerizar aplicación.
 * [ ] Configurar CI/CD.
 * [ ] Deploy de producción.
 * [ ] Documentar API.
-* [ ] Frontend (React).
+* [X] Frontend (React).
 
 ## 📌 Estado
 

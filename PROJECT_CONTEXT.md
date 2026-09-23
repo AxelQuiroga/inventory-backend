@@ -889,8 +889,3 @@ sistema.
 escape (rich text, markdown) o crece el equipo/la superficie, migrar a cookies
 httpOnly + SameSite y reconsiderar. Hasta esa fecha, localStorage es la
 decisión simple y correcta para este sistema.
-
-{
-  "email": "admin@inventory.com",
-  "password": "admin123"
-} ADMIN
