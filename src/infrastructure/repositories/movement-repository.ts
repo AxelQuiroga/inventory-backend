@@ -5,6 +5,7 @@ import { products } from '../database/schema/products';
 import { users } from '../database/schema/users';
 import type { MovementRepository, CreateMovementData, MovementFilters } from '../../domain/interfaces/movement-repository';
 import type { Movement, GlobalMovement } from '../../domain/entities/movement';
+import type { Paginated } from '../../domain/interfaces/pagination';
 
 export class DrizzleMovementRepository implements MovementRepository {
 
@@ -109,7 +110,7 @@ export class DrizzleMovementRepository implements MovementRepository {
     });
   }
 
-  async findByProductId(productId: string, options?: { page?: number; limit?: number }): Promise<Movement[]> {
+  async findByProductId(productId: string, options?: { page?: number; limit?: number }): Promise<Paginated<Movement>> {
     const { offset, limit } = this.buildPagination(options);
 
     const results = await db
@@ -120,10 +121,18 @@ export class DrizzleMovementRepository implements MovementRepository {
       .limit(limit)
       .offset(offset);
 
-    return results.map((r) => this.toDomain(r));
+    const [totalRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(movements)
+      .where(eq(movements.productId, productId));
+
+    return {
+      data: results.map((r) => this.toDomain(r)),
+      total: totalRow?.count ?? 0,
+    };
   }
 
-  async findGlobal(filters: MovementFilters = {}, options: { includeUser?: boolean } = {}): Promise<GlobalMovement[]> {
+  async findGlobal(filters: MovementFilters = {}, options: { includeUser?: boolean } = {}): Promise<Paginated<GlobalMovement>> {
     const { offset, limit } = this.buildPagination(filters);
 
     // Filtros del contrato: type/productId para todos; userId SOLO cuando la
@@ -134,6 +143,22 @@ export class DrizzleMovementRepository implements MovementRepository {
     if (options.includeUser && filters.userId) conditions.push(eq(movements.userId, filters.userId));
     // and() con lista vacía devuelve undefined (sin WHERE): válido en drizzle.
     const where = and(...conditions);
+
+    // El count replica los MISMOS joins y filtros que la query de datos:
+    // si filtra por autor, el count debe contar solo los de ese autor.
+    const [totalRow] = options.includeUser
+      ? await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(movements)
+          .innerJoin(products, eq(movements.productId, products.id))
+          .innerJoin(users, eq(movements.userId, users.id))
+          .where(where)
+      : await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(movements)
+          .innerJoin(products, eq(movements.productId, products.id))
+          .where(where);
+    const total = totalRow?.count ?? 0;
 
     // El join a users es CONDICIONAL a includeUser: para OPERATOR/VIEWER la
     // query ni siquiera toca la tabla users — el dato no se lee del motor.
@@ -159,18 +184,21 @@ export class DrizzleMovementRepository implements MovementRepository {
         .limit(limit)
         .offset(offset);
 
-      return results.map((r) => ({
-        id: r.id,
-        productId: r.productId,
-        productSku: r.productSku,
-        productName: r.productName,
-        userId: r.userId,
-        userName: r.userName,
-        type: r.type as Movement['type'],
-        quantity: r.quantity,
-        reason: r.reason,
-        createdAt: r.createdAt,
-      }));
+      return {
+        data: results.map((r) => ({
+          id: r.id,
+          productId: r.productId,
+          productSku: r.productSku,
+          productName: r.productName,
+          userId: r.userId,
+          userName: r.userName,
+          type: r.type as Movement['type'],
+          quantity: r.quantity,
+          reason: r.reason,
+          createdAt: r.createdAt,
+        })),
+        total,
+      };
     }
 
     // Sin autoría: NULL literal en los campos de autor (redacción estructural:
@@ -195,18 +223,21 @@ export class DrizzleMovementRepository implements MovementRepository {
       .limit(limit)
       .offset(offset);
 
-    return results.map((r) => ({
-      id: r.id,
-      productId: r.productId,
-      productSku: r.productSku,
-      productName: r.productName,
-      userId: r.userId,
-      userName: r.userName,
-      type: r.type as Movement['type'],
-      quantity: r.quantity,
-      reason: r.reason,
-      createdAt: r.createdAt,
-    }));
+    return {
+      data: results.map((r) => ({
+        id: r.id,
+        productId: r.productId,
+        productSku: r.productSku,
+        productName: r.productName,
+        userId: r.userId,
+        userName: r.userName,
+        type: r.type as Movement['type'],
+        quantity: r.quantity,
+        reason: r.reason,
+        createdAt: r.createdAt,
+      })),
+      total,
+    };
   }
 
   private toDomain(row: typeof movements.$inferSelect): Movement {

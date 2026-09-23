@@ -23,6 +23,7 @@ const repository: ProductRepository = {
   findById: vi.fn(),
   findBySku: vi.fn(),
   findAll: vi.fn(),
+  getSummary: vi.fn(),
   update: vi.fn(),
   setActive: vi.fn(),
 };

@@ -1,4 +1,5 @@
 import type { Movement, GlobalMovement } from '../entities/movement';
+import type { Paginated } from './pagination';
 
 export interface CreateMovementData {
   productId: string;
@@ -18,9 +19,9 @@ export interface MovementFilters {
 export interface MovementRepository {
   createEntry(data: CreateMovementData): Promise<Movement>;
   createExit(data: CreateMovementData): Promise<Movement>;
-  findByProductId(productId: string, options?: { page?: number; limit?: number }): Promise<Movement[]>;
+  findByProductId(productId: string, options?: { page?: number; limit?: number }): Promise<Paginated<Movement>>;
   // Vista global con joins: producto siempre; autoría (userId + userName)
   // solo cuando includeUser=true — el dato de autoría no se consulta para
   // roles que no tienen permiso de verlo.
-  findGlobal(filters?: MovementFilters, options?: { includeUser?: boolean }): Promise<GlobalMovement[]>;
+  findGlobal(filters?: MovementFilters, options?: { includeUser?: boolean }): Promise<Paginated<GlobalMovement>>;
 }

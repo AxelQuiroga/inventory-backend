@@ -147,7 +147,7 @@ describe('PRODUCTS E2E — ciclo de vida', () => {
 
     // Ya no aparece en el listado por defecto
     const list = await app.inject({ method: 'GET', url: '/products', headers: authHeader(adminToken) });
-    const ids = JSON.parse(list.body).map((p: { id: string }) => p.id);
+    const ids = JSON.parse(list.body).data.map((p: { id: string }) => p.id);
     expect(ids).not.toContain(id);
 
     // Pero sigue consultable por id con su historial intacto (soft delete)
@@ -161,7 +161,7 @@ describe('PRODUCTS E2E — ciclo de vida', () => {
       url: '/products?includeInactive=true',
       headers: authHeader(adminToken),
     });
-    const inactiveIds = JSON.parse(withInactive.body).map((p: { id: string }) => p.id);
+    const inactiveIds = JSON.parse(withInactive.body).data.map((p: { id: string }) => p.id);
     expect(inactiveIds).toContain(id);
   });
 
@@ -179,7 +179,7 @@ describe('PRODUCTS E2E — ciclo de vida', () => {
     expect(JSON.parse(on.body).active).toBe(true);
 
     const list = await app.inject({ method: 'GET', url: '/products', headers: authHeader(adminToken) });
-    const ids = JSON.parse(list.body).map((p: { id: string }) => p.id);
+    const ids = JSON.parse(list.body).data.map((p: { id: string }) => p.id);
     expect(ids).toContain(id);
   });
 });
@@ -196,7 +196,7 @@ describe('PRODUCTS E2E — filtros', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    const names = JSON.parse(res.body).map((p: { name: string }) => p.name);
+    const names = JSON.parse(res.body).data.map((p: { name: string }) => p.name);
     expect(names).toHaveLength(1);
     expect(names[0]).toBe('Martillo E2E Premium');
   });
@@ -211,7 +211,7 @@ describe('PRODUCTS E2E — filtros', () => {
       headers: authHeader(adminToken),
     });
 
-    const names = JSON.parse(res.body).map((p: { name: string }) => p.name);
+    const names = JSON.parse(res.body).data.map((p: { name: string }) => p.name);
     expect(names).toEqual(['Producto B']);
   });
 
@@ -226,7 +226,7 @@ describe('PRODUCTS E2E — filtros', () => {
       headers: authHeader(adminToken),
     });
 
-    const names = JSON.parse(res.body).map((p: { name: string }) => p.name);
+    const names = JSON.parse(res.body).data.map((p: { name: string }) => p.name);
     expect(names).toEqual(['Medio']);
   });
 
@@ -241,7 +241,7 @@ describe('PRODUCTS E2E — filtros', () => {
       headers: authHeader(adminToken),
     });
 
-    const names = JSON.parse(res.body).map((p: { name: string }) => p.name);
+    const names = JSON.parse(res.body).data.map((p: { name: string }) => p.name);
     expect(names).toEqual(['Precio 10', 'Precio 20', 'Precio 30']);
   });
 
@@ -259,12 +259,12 @@ describe('PRODUCTS E2E — filtros', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    const names = JSON.parse(res.body).map((p: { name: string }) => p.name);
+    const names = JSON.parse(res.body).data.map((p: { name: string }) => p.name);
     expect(names).toContain('Bajo stock');
     expect(names).not.toContain('Stock sano');
   });
 
-  it('limit pagina el listado', async () => {
+  it('limit pagina el listado y el contrato expone { data, total }', async () => {
     await createProductViaApi(app, adminToken, { name: 'Pag A' });
     await createProductViaApi(app, adminToken, { name: 'Pag B' });
     await createProductViaApi(app, adminToken, { name: 'Pag C' });
@@ -276,7 +276,8 @@ describe('PRODUCTS E2E — filtros', () => {
     });
 
     const body = JSON.parse(res.body);
-    expect(body).toHaveLength(2);
+    expect(body.data).toHaveLength(2);
+    expect(body.total).toBe(3); // el total NO se recorta con el limit
   });
 });
 
@@ -309,10 +310,11 @@ describe('PRODUCTS E2E — creación con stock inicial', () => {
     });
     expect(history.statusCode).toBe(200);
     const movements = JSON.parse(history.body);
-    expect(movements).toHaveLength(1);
-    expect(movements[0].type).toBe('IN');
-    expect(movements[0].quantity).toBe(250);
-    expect(movements[0].reason).toBe('Stock inicial');
+    expect(movements.data).toHaveLength(1);
+    expect(movements.total).toBe(1);
+    expect(movements.data[0].type).toBe('IN');
+    expect(movements.data[0].quantity).toBe(250);
+    expect(movements.data[0].reason).toBe('Stock inicial');
 
     // El stock DEBE quedar persistido: la respuesta 201 no puede mentir
     const persisted = await app.inject({
@@ -342,7 +344,7 @@ describe('PRODUCTS E2E — creación con stock inicial', () => {
       url: `/movements/history/${product.id}`,
       headers: authHeader(adminToken),
     });
-    expect(JSON.parse(history.body)).toHaveLength(0);
+    expect(JSON.parse(history.body).data).toHaveLength(0);
   });
 
   it('initialStock inválido (negativo o no entero): 400 y NO se crea el producto', async () => {
@@ -364,7 +366,7 @@ describe('PRODUCTS E2E — creación con stock inicial', () => {
       url: '/products',
       headers: authHeader(adminToken),
     });
-    const names = JSON.parse(list.body).map((p: { name: string }) => p.name);
+    const names = JSON.parse(list.body).data.map((p: { name: string }) => p.name);
     expect(names).not.toContain('Inválido');
   });
 
@@ -381,5 +383,41 @@ describe('PRODUCTS E2E — creación con stock inicial', () => {
     });
 
     expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('PRODUCTS E2E — GET /products/summary (agregados del dashboard)', () => {
+  it('devuelve { total, totalStock, lowStock } contando solo activos', async () => {
+    // Activo con stock sano
+    const sano = await createProductViaApi(app, adminToken, { name: 'Sano', minStock: 2 });
+    await addStock(sano.id, 8);
+
+    // Activo con stock bajo (nace 0 <= minStock 5)
+    await createProductViaApi(app, adminToken, { name: 'Bajo', minStock: 5 });
+
+    // Se desactiva: NO debe contar en ningún agregado
+    const inactivo = await createProductViaApi(app, adminToken, { name: 'Inactivo', minStock: 5 });
+    await app.inject({
+      method: 'POST',
+      url: `/products/${inactivo.id}/deactivate`,
+      headers: authHeader(adminToken),
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/products/summary',
+      headers: authHeader(adminToken),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const summary = JSON.parse(res.body);
+    expect(summary.total).toBe(2);          // Sano + Bajo (el inactivo no suma)
+    expect(summary.totalStock).toBe(8);     // solo el stock de Sano
+    expect(summary.lowStock).toBe(1);       // solo Bajo
+  });
+
+  it('sin token: 401', async () => {
+    const noToken = await app.inject({ method: 'GET', url: '/products/summary' });
+    expect(noToken.statusCode).toBe(401);
   });
 });

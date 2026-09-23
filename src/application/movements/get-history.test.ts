@@ -38,31 +38,32 @@ beforeEach(() => {
 });
 
 describe('GetMovementHistory', () => {
-  it('devuelve el historial de movimientos del producto', async () => {
-    vi.mocked(movementRepository.findByProductId).mockResolvedValue(movements);
+  it('devuelve el historial de movimientos del producto con su total', async () => {
+    vi.mocked(movementRepository.findByProductId).mockResolvedValue({ data: movements, total: movements.length });
 
     const result = await useCase.execute('prod-1');
 
     expect(movementRepository.findByProductId).toHaveBeenCalledWith('prod-1', {});
-    expect(result).toHaveLength(2);
-    expect(result[0]?.type).toBe(MovementType.IN);
-    expect(result[1]?.type).toBe(MovementType.OUT);
+    expect(result.total).toBe(2);
+    expect(result.data).toHaveLength(2);
+    expect(result.data[0]?.type).toBe(MovementType.IN);
+    expect(result.data[1]?.type).toBe(MovementType.OUT);
   });
 
   it('devuelve lista vacía cuando no hay movimientos', async () => {
-    vi.mocked(movementRepository.findByProductId).mockResolvedValue([]);
+    vi.mocked(movementRepository.findByProductId).mockResolvedValue({ data: [], total: 0 });
 
     const result = await useCase.execute('prod-sin-movimientos');
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ data: [], total: 0 });
   });
 
   it('reenvía las opciones de paginación al repositorio', async () => {
-    vi.mocked(movementRepository.findByProductId).mockResolvedValue(movements);
+    vi.mocked(movementRepository.findByProductId).mockResolvedValue({ data: movements, total: 5 });
 
     const result = await useCase.execute('prod-1', { page: 2, limit: 10 });
 
     expect(movementRepository.findByProductId).toHaveBeenCalledWith('prod-1', { page: 2, limit: 10 });
-    expect(result).toHaveLength(2);
+    expect(result.data).toHaveLength(2);
   });
 });

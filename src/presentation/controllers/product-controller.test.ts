@@ -19,6 +19,7 @@ const controller = new ProductController(
   useCase, // ReactivateProduct
   useCase, // GetProduct
   useCase, // ListProducts
+  useCase, // GetProductSummary
 );
 
 const USER_ID = 'a1b2c3d4-5e6f-7890-abcd-ef1234567890';
@@ -108,5 +109,28 @@ describe('ProductController.create', () => {
     expect(reply.status).toHaveBeenCalledWith(500);
     expect(reply.send).toHaveBeenCalledWith({ message: 'Internal server error' });
     expect(request.log.error).toHaveBeenCalledWith(expect.anything(), 'Unexpected error in product controller');
+  });
+});
+
+describe('ProductController.getSummary', () => {
+  it('reenvía la proyección agregada sin tocar query params', async () => {
+    const summary = { total: 4, totalStock: 513, lowStock: 2 };
+    execute.mockResolvedValue(summary);
+
+    const reply = makeReply();
+    await controller.getSummary(makeRequest({ query: {} }), reply);
+
+    expect(reply.send).toHaveBeenCalledWith(summary);
+  });
+
+  it('errores no mapeados devuelven 500', async () => {
+    execute.mockRejectedValue(new Error('connection terminated unexpectedly'));
+
+    const request = makeRequest();
+    const reply = makeReply();
+    await controller.getSummary(request, reply);
+
+    expect(reply.status).toHaveBeenCalledWith(500);
+    expect(reply.send).toHaveBeenCalledWith({ message: 'Internal server error' });
   });
 });

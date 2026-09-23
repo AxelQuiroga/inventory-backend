@@ -65,8 +65,8 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
     expect(refreshed?.stock).toBe(20);
 
     const history = await movementRepo.findByProductId(product.id);
-    expect(history).toHaveLength(1);
-    expect(history[0]?.reason).toBe('Stock inicial');
+    expect(history.data).toHaveLength(1);
+    expect(history.data[0]?.reason).toBe('Stock inicial');
   });
 
   it('12b. createWithInitialStock: crea producto con stock + movimiento IN en una transacción', async () => {
@@ -91,11 +91,11 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
 
     // El movimiento quedó registrado con su usuario (trazabilidad)
     const history = await movementRepo.findByProductId(created.id);
-    expect(history).toHaveLength(1);
-    expect(history[0]?.type).toBe('IN');
-    expect(history[0]?.quantity).toBe(250);
-    expect(history[0]?.reason).toBe('Stock inicial');
-    expect(history[0]?.userId).toBe(user.id);
+    expect(history.data).toHaveLength(1);
+    expect(history.data[0]?.type).toBe('IN');
+    expect(history.data[0]?.quantity).toBe(250);
+    expect(history.data[0]?.reason).toBe('Stock inicial');
+    expect(history.data[0]?.userId).toBe(user.id);
   });
 
   it('12c. createWithInitialStock con userId inexistente: revierte TODO (no queda producto ni movimiento)', async () => {
@@ -139,15 +139,15 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
 
     // Historial intacto
     const history = await movementRepo.findByProductId(product.id);
-    expect(history).toHaveLength(1);
+    expect(history.data).toHaveLength(1);
 
     // El listado por defecto lo excluye
     const list = await repo.findAll();
-    expect(list.find((p) => p.id === product.id)).toBeUndefined();
+    expect(list.data.find((p) => p.id === product.id)).toBeUndefined();
 
     // includeInactive (ADMIN) lo incluye
     const adminList = await repo.findAll({ includeInactive: true });
-    expect(adminList.find((p) => p.id === product.id)).toBeDefined();
+    expect(adminList.data.find((p) => p.id === product.id)).toBeDefined();
 
     // findBySku conserva el SKU del inactivo (para validar unicidad)
     const bySku = await repo.findBySku('SILLA-001');
@@ -190,7 +190,7 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
 
     // Aparece en el listado por defecto
     const list = await repo.findAll();
-    expect(list.find((p) => p.id === product.id)).toBeDefined();
+    expect(list.data.find((p) => p.id === product.id)).toBeDefined();
   });
 
   it('GET by id: devuelve el inactivo con active=false (no 404)', async () => {
@@ -254,14 +254,47 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
     await repo.setActive(inactive.id, false);
 
     const defaultList = await repo.findAll({ category: 'Cat' });
-    const onlyActive = defaultList.map((p) => p.id);
+    const onlyActive = defaultList.data.map((p) => p.id);
     expect(onlyActive).toContain(active.id);
     expect(onlyActive).not.toContain(inactive.id);
+    expect(defaultList.total).toBe(1);
 
     const withInactive = await repo.findAll({ category: 'Cat', includeInactive: true });
-    const allIds = withInactive.map((p) => p.id);
+    const allIds = withInactive.data.map((p) => p.id);
     expect(allIds).toContain(active.id);
     expect(allIds).toContain(inactive.id);
+    expect(withInactive.total).toBe(2);
+  });
+
+  it('getSummary: agrega total de activos, suma de stock y stock bajo en una query', async () => {
+    const user = await createUser();
+
+    // Activo con stock (stock > minStock)
+    const healthy = await repo.createWithInitialStock({
+      product: { name: 'Sano', description: '', sku: 'SUM-001', category: 'Cat', price: 10, minStock: 5 },
+      initialStock: 20,
+      userId: user.id,
+    });
+
+    // Activo con stock bajo (stock <= minStock)
+    const low = await repo.createWithInitialStock({
+      product: { name: 'Bajo', description: '', sku: 'SUM-002', category: 'Cat', price: 10, minStock: 5 },
+      initialStock: 3,
+      userId: user.id,
+    });
+
+    // Inactivo: NO debe contar en ningún agregado (soft delete del listado)
+    const inactive = await repo.create({ name: 'Inactivo', description: '', sku: 'SUM-003', category: 'Cat', price: 10, minStock: 5 });
+    await repo.setActive(inactive.id, false);
+
+    const summary = await repo.getSummary();
+
+    expect(summary.total).toBe(2);           // solo activos
+    expect(summary.totalStock).toBe(23);     // 20 + 3 (el inactivo no suma)
+    expect(summary.lowStock).toBe(1);        // solo el "Bajo"
+    expect(healthy.stock).toBe(20);
+    expect(low.stock).toBe(3);
+    expect(inactive.stock).toBe(0);
   });
 
   it('sanity: conecta a la base de TEST, nunca a la de desarrollo', async () => {

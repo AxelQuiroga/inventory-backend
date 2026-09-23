@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import jwt from 'jsonwebtoken';
 import type { FastifyInstance } from 'fastify';
 
 import {
@@ -100,6 +101,24 @@ describe('AUTH E2E', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toEqual([]);
+    expect(JSON.parse(res.body)).toEqual({ data: [], total: 0 });
+  });
+
+  it('acceso con JWT expirado devuelve 401 (el server valida exp)', async () => {
+    // Firma con la MISMA lib (jsonwebtoken) y el MISMO secreto que la app:
+    // si el server rechaza, el único motivo posible es la expiración.
+    const expired = jwt.sign(
+      { userId: creds.admin.id, email: creds.admin.email, role: 'ADMIN' },
+      process.env.JWT_SECRET!,
+      { expiresIn: -60 }, // ya venció hace 60 segundos
+    );
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/products',
+      headers: authHeader(expired),
+    });
+
+    expect(res.statusCode).toBe(401);
   });
 });

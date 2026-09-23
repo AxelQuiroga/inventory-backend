@@ -33,7 +33,7 @@ beforeEach(() => {
 
 describe('GetMovements — política de visibilidad por rol', () => {
   it('ADMIN: pide la autoría (includeUser=true) y conserva el filtro de usuario', async () => {
-    vi.mocked(movementRepository.findGlobal).mockResolvedValue(movements);
+    vi.mocked(movementRepository.findGlobal).mockResolvedValue({ data: movements, total: movements.length });
 
     const result = await useCase.execute({
       role: 'ADMIN',
@@ -47,11 +47,11 @@ describe('GetMovements — política de visibilidad por rol', () => {
       { userId: 'user-1', type: 'IN', page: 1, limit: 20 },
       { includeUser: true },
     );
-    expect(result).toEqual(movements);
+    expect(result).toEqual({ data: movements, total: movements.length });
   });
 
   it('OPERATOR: sin autoría (includeUser=false) y DESCARTA el filtro de usuario', async () => {
-    vi.mocked(movementRepository.findGlobal).mockResolvedValue(movements);
+    vi.mocked(movementRepository.findGlobal).mockResolvedValue({ data: movements, total: movements.length });
 
     // Aunque el cliente mande userId (no debería), la política lo ignora:
     // un rol que no ve autores no puede filtrar por uno.
@@ -67,11 +67,11 @@ describe('GetMovements — política de visibilidad por rol', () => {
       { type: 'OUT', page: 1, limit: 20 },
       { includeUser: false },
     );
-    expect(result).toEqual(movements);
+    expect(result).toEqual({ data: movements, total: movements.length });
   });
 
   it('VIEWER: mismo trato que OPERATOR — sin autoría y sin filtro de usuario', async () => {
-    vi.mocked(movementRepository.findGlobal).mockResolvedValue([]);
+    vi.mocked(movementRepository.findGlobal).mockResolvedValue({ data: [], total: 0 });
 
     const result = await useCase.execute({ role: 'VIEWER', page: 1, limit: 20 });
 
@@ -79,6 +79,6 @@ describe('GetMovements — política de visibilidad por rol', () => {
       { page: 1, limit: 20 },
       { includeUser: false },
     );
-    expect(result).toEqual([]);
+    expect(result).toEqual({ data: [], total: 0 });
   });
 });

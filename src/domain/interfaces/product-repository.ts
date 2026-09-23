@@ -1,4 +1,5 @@
 import type { Product } from "../entities/product.js";
+import type { Paginated } from "./pagination.js";
 
 export interface ProductFilters {
   search?: string;        // Busca en nombre, descripción, SKU
@@ -11,6 +12,15 @@ export interface ProductFilters {
   order?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+}
+
+// Proyección agregada del inventario para el dashboard: tres sumarizaciones
+// en UNA query (el KPI "stock total" NO puede derivarse de la metadata de
+// paginación — suma lo que trae la página, que no es el total).
+export interface ProductSummary {
+  total: number;       // Productos activos
+  totalStock: number;  // Suma de stock de los activos
+  lowStock: number;    // Activos con stock <= minStock
 }
 
 export type ProductCreateData = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'stock' | 'active'>;
@@ -28,7 +38,8 @@ export interface ProductRepository {
     createWithInitialStock(data: ProductWithInitialStock): Promise<Product>;
     findById(id: string): Promise<Product | null>;
     findBySku(sku: string): Promise<Product | null>;
-    findAll(filters?: ProductFilters): Promise<Product[]>;
+    findAll(filters?: ProductFilters): Promise<Paginated<Product>>;
+    getSummary(): Promise<ProductSummary>;
     update(id: string, data: Partial<ProductCreateData>): Promise<Product | null>;
     setActive(id: string, active: boolean): Promise<Product | null>;
 }

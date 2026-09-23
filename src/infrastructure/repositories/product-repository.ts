@@ -2,8 +2,9 @@ import { eq, like, and, gte, lte, sql, asc, desc, ilike } from 'drizzle-orm';
 import { db } from '../database';
 import { products } from '../database/schema/products';
 import { movements } from '../database/schema/movements';
-import type { ProductRepository, ProductFilters, ProductCreateData, ProductWithInitialStock } from '../../domain/interfaces/product-repository';
+import type { ProductRepository, ProductFilters, ProductCreateData, ProductWithInitialStock, ProductSummary } from '../../domain/interfaces/product-repository';
 import type { Product } from '../../domain/entities/product';
+import type { Paginated } from '../../domain/interfaces/pagination';
 
 export class DrizzleProductRepository implements ProductRepository {
 
@@ -87,7 +88,7 @@ export class DrizzleProductRepository implements ProductRepository {
     return found ? this.toDomain(found) : null;
   }
 
-  async findAll(filters?: ProductFilters): Promise<Product[]> {
+  async findAll(filters?: ProductFilters): Promise<Paginated<Product>> {
     const conditions = this.buildConditions(filters);
 
     // Por defecto solo productos activos (soft delete). Solo el flag
@@ -108,7 +109,38 @@ export class DrizzleProductRepository implements ProductRepository {
       .limit(limit)
       .offset(offset);
 
-    return results.map((r) => this.toDomain(r));
+    // El count replica EXACTAMENTE el mismo conjunto de conditions que la
+    // query de datos (incluido el filtro hidden de active).
+    const [totalRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(products)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    return {
+      data: results.map((r) => this.toDomain(r)),
+      total: totalRow?.count ?? 0,
+    };
+  }
+
+  // Proyección agregada del dashboard en una sola pasada: total de activos,
+  // suma de stock de activos y conteo de activos con stock <= minStock.
+  // count(*) + sum(stock) + count(*) FILTER son tres agregados en UNA query
+  // contra la misma tabla — el motor los resuelve en un único scan.
+  async getSummary(): Promise<ProductSummary> {
+    const [row] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        totalStock: sql<number>`coalesce(sum(stock), 0)::int`,
+        lowStock: sql<number>`count(*) filter (where stock <= min_stock)::int`,
+      })
+      .from(products)
+      .where(eq(products.active, true));
+
+    return {
+      total: row?.total ?? 0,
+      totalStock: row?.totalStock ?? 0,
+      lowStock: row?.lowStock ?? 0,
+    };
   }
 
   async update(

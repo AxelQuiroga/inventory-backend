@@ -219,16 +219,17 @@ describe('INVENTORY E2E — entradas y salidas', () => {
 
     expect(res.statusCode).toBe(200);
     const history = JSON.parse(res.body);
-    expect(history).toHaveLength(3);
+    expect(history.data).toHaveLength(3);
+    expect(history.total).toBe(3);
 
     // El historial explica el stock final: 10 - 4 + 2 = 8
     expect(await getCurrentStock(id)).toBe(8);
 
     // Más reciente primero (orden del repositorio)
-    expect(history[0].type).toBe('IN');
-    expect(history[0].reason).toBe('Reposición');
-    expect(history[1].type).toBe('OUT');
-    expect(history[2].type).toBe('IN');
+    expect(history.data[0].type).toBe('IN');
+    expect(history.data[0].reason).toBe('Reposición');
+    expect(history.data[1].type).toBe('OUT');
+    expect(history.data[2].type).toBe('IN');
   });
 
   it('el historial se pagina con limit y page (más reciente primero)', async () => {
@@ -251,12 +252,13 @@ describe('INVENTORY E2E — entradas y salidas', () => {
 
     expect(res.statusCode).toBe(200);
     const history = JSON.parse(res.body);
-    expect(history).toHaveLength(2);
+    expect(history.data).toHaveLength(2);
+    expect(history.total).toBe(5); // el total NO se recorta con la página
 
     // Más reciente primero: Alta 5, Alta 4, Alta 3, Alta 2, Alta 1
     // página 2 con limit 2 => [Alta 3, Alta 2]
-    expect(history[0]?.reason).toBe('Alta 3');
-    expect(history[1]?.reason).toBe('Alta 2');
+    expect(history.data[0]?.reason).toBe('Alta 3');
+    expect(history.data[1]?.reason).toBe('Alta 2');
   });
 
   it('limit inválido en el historial devuelve 400', async () => {
@@ -304,9 +306,10 @@ describe('AUDIT E2E — trazabilidad e inmutabilidad', () => {
     });
 
     const history = JSON.parse(res.body);
-    expect(history).toHaveLength(2);
-    expect(history.find((m: { reason: string }) => m.reason === 'Ingreso operador').userId).toBe(operatorId);
-    expect(history.find((m: { reason: string }) => m.reason === 'Salida admin').userId).toBeTruthy();
+    expect(history.data).toHaveLength(2);
+    expect(history.total).toBe(2);
+    expect(history.data.find((m: { reason: string }) => m.reason === 'Ingreso operador').userId).toBe(operatorId);
+    expect(history.data.find((m: { reason: string }) => m.reason === 'Salida admin').userId).toBeTruthy();
   });
 
   it('los movimientos históricos no pueden modificarse ni eliminarse: no hay rutas de mutación', async () => {
@@ -325,7 +328,7 @@ describe('AUDIT E2E — trazabilidad e inmutabilidad', () => {
       url: `/movements/history/${id}`,
       headers: authHeader(adminToken),
     });
-    const movementId = JSON.parse(history.body)[0].id as string;
+    const movementId = JSON.parse(history.body).data[0].id as string;
 
     const put = await app.inject({
       method: 'PUT',
@@ -349,9 +352,9 @@ describe('AUDIT E2E — trazabilidad e inmutabilidad', () => {
       headers: authHeader(adminToken),
     });
     const afterBody = JSON.parse(after.body);
-    expect(afterBody).toHaveLength(1);
-    expect(afterBody[0].quantity).toBe(5);
-    expect(afterBody[0].reason).toBe('Original');
+    expect(afterBody.data).toHaveLength(1);
+    expect(afterBody.data[0].quantity).toBe(5);
+    expect(afterBody.data[0].reason).toBe('Original');
   });
 });
 
@@ -460,12 +463,13 @@ describe('GLOBAL MOVEMENTS E2E — GET /movements y política de visibilidad', (
 
     expect(res.statusCode).toBe(200);
     const movements = JSON.parse(res.body);
-    expect(movements).toHaveLength(1);
-    expect(movements[0].productId).toBe(id);
-    expect(movements[0].productSku).toBeTruthy();
-    expect(movements[0].productName).toBeTruthy();
+    expect(movements.data).toHaveLength(1);
+    expect(movements.total).toBe(1);
+    expect(movements.data[0].productId).toBe(id);
+    expect(movements.data[0].productSku).toBeTruthy();
+    expect(movements.data[0].productName).toBeTruthy();
     // La autoría es dato del ADMIN: el nombre del usuario operador llega.
-    expect(movements[0].userName).toBe('Admin');
+    expect(movements.data[0].userName).toBe('Admin');
   });
 
   it('OPERATOR y VIEWER ven los movimientos pero SIN autoría (userName null)', async () => {
@@ -482,10 +486,11 @@ describe('GLOBAL MOVEMENTS E2E — GET /movements y política de visibilidad', (
 
       expect(res.statusCode).toBe(200);
       const movements = JSON.parse(res.body);
-      expect(movements).toHaveLength(1);
-      expect(movements[0].productSku).toBeTruthy(); // el producto sí viaja
-      expect(movements[0].userId).toBeNull();
-      expect(movements[0].userName).toBeNull(); // la autoría se redacta
+      expect(movements.data).toHaveLength(1);
+      expect(movements.total).toBe(1);
+      expect(movements.data[0].productSku).toBeTruthy(); // el producto sí viaja
+      expect(movements.data[0].userId).toBeNull();
+      expect(movements.data[0].userName).toBeNull(); // la autoría se redacta
     }
   });
 
@@ -513,7 +518,9 @@ describe('GLOBAL MOVEMENTS E2E — GET /movements y política de visibilidad', (
 
     expect(res.statusCode).toBe(200);
     // El filtro de autor se descartó: llegan los 2 movimientos, no 0.
-    expect(JSON.parse(res.body)).toHaveLength(2);
+    const body = JSON.parse(res.body);
+    expect(body.data).toHaveLength(2);
+    expect(body.total).toBe(2);
   });
 
   it('los filtros type/productId funcionan para ADMIN', async () => {
@@ -530,21 +537,21 @@ describe('GLOBAL MOVEMENTS E2E — GET /movements y política de visibilidad', (
       url: '/movements?type=IN',
       headers: authHeader(adminToken),
     });
-    expect(JSON.parse(ins.body)).toHaveLength(1);
+    expect(JSON.parse(ins.body).data).toHaveLength(1);
 
     const outs = await app.inject({
       method: 'GET',
       url: '/movements?type=OUT',
       headers: authHeader(adminToken),
     });
-    expect(JSON.parse(outs.body)).toHaveLength(0);
+    expect(JSON.parse(outs.body).data).toHaveLength(0);
 
     const byProduct = await app.inject({
       method: 'GET',
       url: `/movements?productId=${id}`,
       headers: authHeader(adminToken),
     });
-    expect(JSON.parse(byProduct.body)).toHaveLength(1);
+    expect(JSON.parse(byProduct.body).data).toHaveLength(1);
   });
 
   it('sin token: 401; query inválida: 400', async () => {

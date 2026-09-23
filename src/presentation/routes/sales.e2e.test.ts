@@ -79,10 +79,10 @@ describe('SALES E2E', () => {
     // Trazabilidad: OUT por cada línea con la razón "Venta"
     const history = await app.inject({ method: 'GET', url: `/movements/history/${a.id}`, headers: authHeader(adminToken) });
     const movements = JSON.parse(history.body);
-    expect(movements).toHaveLength(2); // IN inicial + OUT venta
-    expect(movements[0].type).toBe('OUT');
-    expect(movements[0].quantity).toBe(5);
-    expect(movements[0].reason).toBe('Venta');
+    expect(movements.data).toHaveLength(2); // IN inicial + OUT venta
+    expect(movements.data[0].type).toBe('OUT');
+    expect(movements.data[0].quantity).toBe(5);
+    expect(movements.data[0].reason).toBe('Venta');
   });
 
   it('stock insuficiente en UNA línea: 400 y rollback total (ni la línea que alcanzaba se descuenta)', async () => {
@@ -113,8 +113,8 @@ describe('SALES E2E', () => {
     // Sin movimientos OUT de venta (solo el IN inicial)
     const history = await app.inject({ method: 'GET', url: `/movements/history/${a.id}`, headers: authHeader(adminToken) });
     const movements = JSON.parse(history.body);
-    expect(movements).toHaveLength(1);
-    expect(movements[0].type).toBe('IN');
+    expect(movements.data).toHaveLength(1);
+    expect(movements.data[0].type).toBe('IN');
   });
 
   it('producto inactivo en la venta: 400 y nada se descuenta', async () => {

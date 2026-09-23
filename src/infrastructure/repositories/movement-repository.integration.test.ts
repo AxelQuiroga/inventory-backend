@@ -211,12 +211,13 @@ describe('DrizzleMovementRepository (integración real con PostgreSQL)', () => {
     await repo.createExit({ productId: product.id, userId: user.id, quantity: 3, reason: 'Venta' });
 
     const history = await repo.findByProductId(product.id);
-    const original = history.find((m) => m.id === entry.id);
+    const original = history.data.find((m) => m.id === entry.id);
 
     expect(original).toBeDefined();
     expect(original!.quantity).toBe(5);
     expect(original!.type).toBe(MovementType.IN);
     expect(original!.reason).toBe('Stock inicial');
+    expect(history.total).toBe(3);
   });
 
   it('16. findByProductId pagina con limit/page (más reciente primero)', async () => {
@@ -229,18 +230,20 @@ describe('DrizzleMovementRepository (integración real con PostgreSQL)', () => {
 
     // Sin opciones devuelve todo, más reciente primero
     const all = await repo.findByProductId(product.id);
-    expect(all).toHaveLength(5);
-    expect(all[0]!.reason).toBe('Mov 5');
+    expect(all.data).toHaveLength(5);
+    expect(all.total).toBe(5);
+    expect(all.data[0]!.reason).toBe('Mov 5');
 
     // Página 2 con limit 2 => [Mov 3, Mov 2]
     const page2 = await repo.findByProductId(product.id, { page: 2, limit: 2 });
-    expect(page2).toHaveLength(2);
-    expect(page2[0]!.reason).toBe('Mov 3');
-    expect(page2[1]!.reason).toBe('Mov 2');
+    expect(page2.data).toHaveLength(2);
+    expect(page2.data[0]!.reason).toBe('Mov 3');
+    expect(page2.data[1]!.reason).toBe('Mov 2');
 
-    // Página 1 con limit 2 => [Mov 5, Mov 4]
+    // Página 1 con limit 2 => [Mov 5, Mov 4]; el total NO se recorta con la página
     const firstPage = await repo.findByProductId(product.id, { page: 1, limit: 2 });
-    expect(firstPage.map((m) => m.reason)).toEqual(['Mov 5', 'Mov 4']);
+    expect(firstPage.data.map((m) => m.reason)).toEqual(['Mov 5', 'Mov 4']);
+    expect(firstPage.total).toBe(5);
   });
 });
 
@@ -280,8 +283,9 @@ describe('DrizzleMovementRepository.findGlobal (vista global con joins)', () => 
 
     const all = await repo.findGlobal({}, { includeUser: false });
 
-    expect(all).toHaveLength(2);
-    const first = all[0]!;
+    expect(all.data).toHaveLength(2);
+    expect(all.total).toBe(2);
+    const first = all.data[0]!;
     expect(first.productId).toBe(product.id);
     expect(first.productSku).toBe('MAR-1');
     expect(first.productName).toBe('Martillo');
@@ -295,8 +299,9 @@ describe('DrizzleMovementRepository.findGlobal (vista global con joins)', () => 
 
     const all = await repo.findGlobal({}, { includeUser: true });
 
-    expect(all).toHaveLength(2);
-    for (const m of all) {
+    expect(all.data).toHaveLength(2);
+    expect(all.total).toBe(2);
+    for (const m of all.data) {
       expect(m.userId).toBe(user.id);
       expect(m.userName).toBe('Axel Admin');
     }
@@ -306,10 +311,12 @@ describe('DrizzleMovementRepository.findGlobal (vista global con joins)', () => 
     const { entry, exit } = await seedGlobalData();
 
     const ins = await repo.findGlobal({ type: 'IN' }, { includeUser: false });
-    expect(ins.map((m) => m.id)).toEqual([entry.id]);
+    expect(ins.data.map((m) => m.id)).toEqual([entry.id]);
+    expect(ins.total).toBe(1);
 
     const outs = await repo.findGlobal({ type: 'OUT' }, { includeUser: false });
-    expect(outs.map((m) => m.id)).toEqual([exit.id]);
+    expect(outs.data.map((m) => m.id)).toEqual([exit.id]);
+    expect(outs.total).toBe(1);
   });
 
   it('filtra por productId', async () => {
@@ -325,8 +332,9 @@ describe('DrizzleMovementRepository.findGlobal (vista global con joins)', () => 
     });
 
     const filtered = await repo.findGlobal({ productId: product.id }, { includeUser: false });
-    expect(filtered.map((m) => m.id)).toEqual(expect.arrayContaining([entry.id, exit.id]));
-    expect(filtered).toHaveLength(2);
+    expect(filtered.data.map((m) => m.id)).toEqual(expect.arrayContaining([entry.id, exit.id]));
+    expect(filtered.data).toHaveLength(2);
+    expect(filtered.total).toBe(2);
   });
 
   it('filtra por userId SOLO con includeUser; sin autoría lo ignora', async () => {
@@ -341,14 +349,16 @@ describe('DrizzleMovementRepository.findGlobal (vista global con joins)', () => 
     });
 
     const filtered = await repo.findGlobal({ userId: user.id }, { includeUser: true });
-    expect(filtered.map((m) => m.id)).toEqual(expect.arrayContaining([entry.id, exit.id]));
-    expect(filtered).toHaveLength(2);
+    expect(filtered.data.map((m) => m.id)).toEqual(expect.arrayContaining([entry.id, exit.id]));
+    expect(filtered.data).toHaveLength(2);
+    expect(filtered.total).toBe(2);
 
     // Sin permiso de autoría, un userId en los filtros NO condiciona la query:
     // devuelve todo (no filtra por un autor invisible).
     const guarded = await repo.findGlobal({ userId: user.id }, { includeUser: false });
-    expect(guarded).toHaveLength(3);
-    expect(guarded.map((m) => m.id)).toEqual(expect.arrayContaining([entry.id, exit.id]));
+    expect(guarded.data).toHaveLength(3);
+    expect(guarded.total).toBe(3);
+    expect(guarded.data.map((m) => m.id)).toEqual(expect.arrayContaining([entry.id, exit.id]));
   });
 
   it('pagina con limit/page y ordena más reciente primero', async () => {
@@ -358,9 +368,10 @@ describe('DrizzleMovementRepository.findGlobal (vista global con joins)', () => 
     }
 
     const page2 = await repo.findGlobal({ limit: 2, page: 2 }, { includeUser: false });
-    expect(page2).toHaveLength(2);
+    expect(page2.data).toHaveLength(2);
+    expect(page2.total).toBe(5);
     // 5 movs ordenados desc: Extra 3, Extra 2, Extra 1, exit, entry → página 2 = [Extra 1, exit]
-    expect(page2[0]!.reason).toBe('Extra 1');
-    expect(page2[1]!.reason).toBe('Venta');
+    expect(page2.data[0]!.reason).toBe('Extra 1');
+    expect(page2.data[1]!.reason).toBe('Venta');
   });
 });

@@ -1,5 +1,6 @@
 import type { MovementRepository, MovementFilters } from '../../domain/interfaces/movement-repository';
 import type { GlobalMovement } from '../../domain/entities/movement';
+import type { Paginated } from '../../domain/interfaces/pagination';
 
 export interface GetMovementsQuery extends MovementFilters {
   role: string;
@@ -13,7 +14,7 @@ export interface GetMovementsQuery extends MovementFilters {
 export class GetMovements {
   constructor(private movementRepository: MovementRepository) {}
 
-  async execute(query: GetMovementsQuery): Promise<GlobalMovement[]> {
+  async execute(query: GetMovementsQuery): Promise<Paginated<GlobalMovement>> {
     if (query.role === 'ADMIN') {
       const { role, ...filters } = query;
       return this.movementRepository.findGlobal(filters, { includeUser: true });

@@ -5,6 +5,7 @@ import { DeactivateProduct } from '../../application/products/deactivate-product
 import { ReactivateProduct } from '../../application/products/reactivate-product';
 import { GetProduct } from '../../application/products/get-product';
 import { ListProducts } from '../../application/products/list-products';
+import { GetProductSummary } from '../../application/products/get-product-summary';
 import { createProductSchema, updateProductSchema, productQuerySchema, productParamsSchema } from '../schemas/product-schema';
 
 export class ProductController {
@@ -15,6 +16,7 @@ export class ProductController {
     private reactivateProductUseCase: ReactivateProduct,
     private getProductUseCase: GetProduct,
     private listProductsUseCase: ListProducts,
+    private getProductSummaryUseCase: GetProductSummary,
   ) {}
 
   async create(request: FastifyRequest, reply: FastifyReply) {
@@ -53,6 +55,15 @@ export class ProductController {
     try {
       const products = await this.listProductsUseCase.execute(parsed.data);
       return reply.send(products);
+    } catch (error) {
+      return this.handleError(error, reply, request);
+    }
+  }
+
+  async getSummary(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const summary = await this.getProductSummaryUseCase.execute();
+      return reply.send(summary);
     } catch (error) {
       return this.handleError(error, reply, request);
     }

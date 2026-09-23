@@ -131,7 +131,7 @@ describe('MovementController.createEntry', () => {
 
 describe('MovementController.getHistory', () => {
   it('parsea la query de paginación y la pasa al use case', async () => {
-    vi.mocked(movementRepository.findByProductId).mockResolvedValue([entryMovement]);
+    vi.mocked(movementRepository.findByProductId).mockResolvedValue({ data: [entryMovement], total: 1 });
 
     const reply = makeReply();
     await controller.getHistory(
@@ -143,7 +143,7 @@ describe('MovementController.getHistory', () => {
     );
 
     expect(movementRepository.findByProductId).toHaveBeenCalledWith(PRODUCT_ID, { page: 2, limit: 10 });
-    expect(reply.send).toHaveBeenCalledWith([entryMovement]);
+    expect(reply.send).toHaveBeenCalledWith({ data: [entryMovement], total: 1 });
   });
 
   it('query inválida devuelve 400 sin tocar el repositorio', async () => {
@@ -163,7 +163,7 @@ describe('MovementController.getHistory', () => {
 
 describe('MovementController.getMovements', () => {
   it('pasa la query parseada + el role del JWT al use case', async () => {
-    vi.mocked(movementRepository.findGlobal).mockResolvedValue([globalMovement]);
+    vi.mocked(movementRepository.findGlobal).mockResolvedValue({ data: [globalMovement], total: 1 });
 
     const reply = makeReply();
     await controller.getMovements(
@@ -178,11 +178,11 @@ describe('MovementController.getMovements', () => {
       { page: 1, limit: 50, type: 'IN' },
       { includeUser: true },
     );
-    expect(reply.send).toHaveBeenCalledWith([globalMovement]);
+    expect(reply.send).toHaveBeenCalledWith({ data: [globalMovement], total: 1 });
   });
 
   it('OPERATOR recibe la vista global sin autoría (la política vive en el use case)', async () => {
-    vi.mocked(movementRepository.findGlobal).mockResolvedValue([globalMovement]);
+    vi.mocked(movementRepository.findGlobal).mockResolvedValue({ data: [globalMovement], total: 1 });
 
     const reply = makeReply();
     await controller.getMovements(
@@ -197,7 +197,7 @@ describe('MovementController.getMovements', () => {
       { page: 1, limit: 20 },
       { includeUser: false },
     );
-    expect(reply.send).toHaveBeenCalledWith([globalMovement]);
+    expect(reply.send).toHaveBeenCalledWith({ data: [globalMovement], total: 1 });
   });
 
   it('query inválida devuelve 400 sin tocar el repositorio', async () => {
