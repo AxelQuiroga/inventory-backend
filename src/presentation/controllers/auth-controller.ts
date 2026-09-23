@@ -1,6 +1,11 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { Login } from '../../application/auth/login';
 import { Register } from '../../application/auth/register';
+import {
+  InvalidCredentialsError,
+  AccountDeactivatedError,
+  EmailAlreadyRegisteredError,
+} from '../../domain/auth-errors';
 import { loginSchema, registerSchema } from '../schemas/auth-schema';
 
 export class AuthController {
@@ -19,10 +24,10 @@ export class AuthController {
       const token = await this.loginUseCase.execute(parsed.data.email, parsed.data.password);
       return reply.send({ token });
     } catch (error) {
-      if (error instanceof Error && error.message === 'Invalid credentials') {
+      if (error instanceof InvalidCredentialsError) {
         return reply.status(401).send({ message: 'Invalid credentials' });
       }
-      if (error instanceof Error && error.message === 'User is deactivated') {
+      if (error instanceof AccountDeactivatedError) {
         return reply.status(401).send({ message: 'User is deactivated' });
       }
       return reply.status(500).send({ message: 'Internal server error' });
@@ -39,7 +44,7 @@ export class AuthController {
       const user = await this.registerUseCase.execute(parsed.data);
       return reply.status(201).send(user);
     } catch (error) {
-      if (error instanceof Error && error.message === 'Email already registered') {
+      if (error instanceof EmailAlreadyRegisteredError) {
         return reply.status(409).send({ message: 'Email already registered' });
       }
       return reply.status(500).send({ message: 'Internal server error' });

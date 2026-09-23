@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import type { UserRepository } from '../../domain/interfaces/user-repository';
 import { UserRole, type User } from '../../domain/entities/user';
+import { BCRYPT_ROUNDS } from '../../domain/auth';
+import { EmailAlreadyRegisteredError } from '../../domain/auth-errors';
 
 export class Register {
   constructor(private userRepository: UserRepository) {}
@@ -13,10 +15,10 @@ export class Register {
   }): Promise<Omit<User, 'password'>> {
     const existing = await this.userRepository.findByEmail(data.email);
     if (existing) {
-      throw new Error('Email already registered');
+      throw new EmailAlreadyRegisteredError();
     }
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const hashedPassword = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
 
     const user = await this.userRepository.create({
       email: data.email,

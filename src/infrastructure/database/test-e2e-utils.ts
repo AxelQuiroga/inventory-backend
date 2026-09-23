@@ -5,6 +5,7 @@ import { testDb, testPool, closeTestDb } from './test-db';
 import { resetTestDb, verifyTestDbIsReady } from './test-utils';
 import { users, UserRole } from './schema/users';
 import { closeDb } from './index';
+import { BCRYPT_ROUNDS } from '../../domain/auth';
 
 // La app se construye con Fastify real y pools reales apuntando a la test DB:
 // el setup file (test-e2e-env.ts) reescribe DATABASE_URL antes de que los
@@ -44,7 +45,7 @@ export interface E2eCredentials {
 export async function resetE2eDb(): Promise<E2eCredentials> {
   await resetTestDb();
 
-  const password = await bcrypt.hash('admin123', 10);
+  const password = await bcrypt.hash('admin123', BCRYPT_ROUNDS);
   await testDb
     .insert(users)
     .values([

@@ -1,11 +1,12 @@
 import bcrypt from 'bcryptjs';
 import { db } from './index';
 import { users, UserRole } from './schema/users';
+import { BCRYPT_ROUNDS } from '../../domain/auth';
 
 async function seed() {
   console.log('🌱 Seeding database...');
 
-  const hashedPassword = await bcrypt.hash('admin123', 10);
+  const hashedPassword = await bcrypt.hash('admin123', BCRYPT_ROUNDS);
 
   const [admin] = await db
     .insert(users)

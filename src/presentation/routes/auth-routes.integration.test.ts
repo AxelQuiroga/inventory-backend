@@ -7,9 +7,13 @@ vi.mock('../../infrastructure/database', async () => {
   return { db: testDb };
 });
 
-// Secret del JWT para construir tokens de prueba y validarlos en authenticate
-const JWT_SECRET = 'http-test-secret';
+// Secret del JWT para construir tokens de prueba y validarlos en authenticate.
+// Debe cumplir el contrato de env (>= 32 chars): el schema de loadEnv() lo exige.
+const JWT_SECRET = 'http-test-secret-0123456789abcdef';
 process.env.JWT_SECRET = JWT_SECRET;
+// El módulo de base de datos está mockeado (arriba), la URL nunca se conecta:
+// solo satisface la validación de env para pasar por buildApp().
+process.env.DATABASE_URL = 'postgresql://fake:fake@localhost:5432/fake';
 
 import { buildApp } from '../../app';
 import { verifyTestDbIsReady, resetTestDb, createUser, createProduct } from '../../infrastructure/database/test-utils';

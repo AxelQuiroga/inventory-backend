@@ -60,6 +60,28 @@ describe('Login', () => {
     );
   });
 
+  it('ejecuta bcrypt.compare contra un hash dummy cuando el email no existe (anti timing attack)', async () => {
+    // La defensa contra el side channel es COMPORTAMIENTAL: con email
+    // inexistente TIENE que haber pasado por bcrypt (contra el dummy), como
+    // con un usuario real. No se mide latencia (flaky): se espiá la llamada.
+    // El espía: los types de @types/bcryptjs (^2.x, callbacks) difieren del
+    // runtime v3 (promesas) y el spy infiere el overload con void; el false
+    // documenta el resultado que producimos para esta rama.
+    const compareSpy = vi.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+    vi.mocked(userRepository.findByEmail).mockResolvedValue(null);
+
+    await expect(useCase.execute('nobody@example.com', 'password123')).rejects.toThrow(
+      'Invalid credentials',
+    );
+
+    expect(compareSpy).toHaveBeenCalledTimes(1);
+    // El dummy debe tener EXACTAMENTE el costo de producción ($2b$12$): si no,
+    // la rama inexistente volvería a diferenciarse por tiempo.
+    const hashArgument = compareSpy.mock.calls[0]![1];
+    expect(hashArgument).toMatch(/^\$2b\$12\$/);
+    compareSpy.mockRestore();
+  });
+
   it('lanza error cuando la cuenta está desactivada (aunque la password sea válida)', async () => {
     vi.mocked(userRepository.findByEmail).mockResolvedValue({ ...user, active: false });
 
