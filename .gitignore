@@ -47,3 +47,5 @@ temp/
 
 # Docker
 docker-compose.override.yml
+# Deepwork orchestration state (local, never committed)
+.slim/deepwork/

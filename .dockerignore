@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.git
+.slim
+logs
+*.log
+npm-debug.log*
+test-results
+playwright-report
+Dockerfile
+.dockerignore

@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend:
+    name: Backend (typecheck + unit + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias (lockfile congelado)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: 'Tests unitarios (vitest: solo src/**/*.test.ts)'
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  db-tests:
+    name: Backend (integration + e2e, real Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: inventory_system
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d inventory_system"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/inventory_system
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias (lockfile congelado)
+        run: npm ci
+
+      - name: Crear base de tests (inventory_system_test)
+        run: |
+          node --input-type=module -e "
+          import { Client } from 'pg';
+          const client = new Client({ connectionString: process.env.DATABASE_URL });
+          await client.connect();
+          try {
+            await client.query('CREATE DATABASE inventory_system_test');
+            console.log('inventory_system_test creada');
+          } catch (err) {
+            if (err.code !== '42P04') throw err;
+            console.log('inventory_system_test ya existía');
+          }
+          await client.end();
+          "
+
+      # Mismo path que el entrypoint de Docker (F2/F3): si el journal de
+      # migraciones está desincronizado con los archivos schema .ts, esto
+      # falla AHORA en CI en vez de matar el contenedor en boot.
+      - name: Verificar que las migraciones aplican en DB vacía
+        run: npm run db:migrate
+
+      - name: Aplicar schema a la base de tests
+        run: npm run db:push:test
+
+      - name: Tests de integración
+        run: npm run test:integration
+
+      - name: Tests e2e del backend (app real + test DB)
+        run: npm run test:e2e
