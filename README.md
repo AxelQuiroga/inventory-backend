@@ -189,15 +189,32 @@ E2E
 
 ## 🐳 Docker
 
-**Pendiente** — todavía no hay `Dockerfile` ni `docker-compose.yml` en el repositorio.
-
-Cuando se implemente, el flujo previsto será:
+Imagen multi-stage (`Dockerfile`): stage **build** (npm ci + typecheck +
+bundles esbuild CJS) → stage **runtime** (Node 24 slim, usuario NON-root, solo
+`out/` + migraciones versionadas). El entrypoint SIEMPRE corre las migraciones
+antes de servir, y el seed se ejecuta solo si `SEED=true`.
 
 ```bash
-docker compose build
-docker compose up
-docker compose down
+# Build de la imagen del backend (app + Postgres del workspace completo:
+# frontend incluido, ver docker-compose.yml en la raíz del proyecto).
+docker build -t inventory-backend .
 ```
+
+Variables relevantes: `DATABASE_URL`, `JWT_SECRET` (mínimo 32 caracteres),
+`PORT`, `CORS_ORIGINS`, `RATE_LIMIT_*` (ver `.env.example` y
+`src/config/env.ts`). Los valores reales nunca se commitean.
+
+El CI (`.github/workflows/ci.yml`) corre unit + integración + e2e de API sobre
+PostgreSQL real en cada push a `main`.
+
+### 🌱 Acceso demo (seed)
+
+Al bootear con `SEED=true` (o `npm run db:seed` localmente) se crea el admin
+inicial: **admin@inventory.com / admin123**.
+
+Es una credencial de **DEMO** para desarrollo. En producción se reemplaza por
+creación manual o variables de entorno; no usar ese password fuera de un
+entorno local.
 
 ## 🔐 Variables de entorno
 
@@ -234,8 +251,8 @@ El archivo `.env` debe permanecer fuera del control de versiones.
 * [X] Implementar tests unit (capa application).
 * [X] Tests de integración (PostgreSQL real — las reglas críticas del stock) y e2e de API.
 * [X] Endurecer seguridad (env Zod, JWT único, login timing-safe, bcrypt 12, rate limit, CORS allowlist).
-* [ ] Dockerizar aplicación.
-* [ ] Configurar CI/CD.
+* [X] Dockerizar aplicación.
+* [X] Configurar CI/CD.
 * [ ] Deploy de producción.
 * [ ] Documentar API.
 * [X] Frontend (React).
