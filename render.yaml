@@ -1,0 +1,37 @@
+# Render Blueprint — deploy del backend del ERP.
+#
+# Uso:
+#   1) Conectar el repo `inventory-backend` en Render y elegir este archivo.
+#   2) En el dashboard del servicio, definir a mano (sync: false):
+#        - JWT_SECRET: secreto de firma, MINIMO 32 chars.
+#        - CORS_ORIGINS: allowlist de orígenes, p. ej. la URL pública del
+#          frontend en Render (https://inventory-frontend.onrender.com).
+#   3) Seed demo (idempotente) al boot: SEED=true crea admin@inventory.com / admin123.
+#      Se puede bajar a false en producción.
+#
+# El Dockerfile ya hace migraciones SIEMPRE antes de servir y corre como non-root.
+services:
+  - type: web
+    name: inventory-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      # Connection string de la base propia de este blueprint (abajo).
+      - key: DATABASE_URL
+        fromDatabase:
+          name: inventory-db
+          property: connectionString
+      # Secretos: se definen en el dashboard de Render (sync: false = se
+      # versionan SOLO las claves, nunca los valores).
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SEED
+        value: "true"
+
+databases:
+  - name: inventory-db
+    plan: free
+    databaseName: inventory_system
