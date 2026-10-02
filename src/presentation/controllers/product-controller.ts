@@ -44,14 +44,8 @@ export class ProductController {
       return reply.status(400).send({ message: 'Invalid query', errors: parsed.error.flatten() });
     }
 
-    // includeInactive es un mecanismo reservado a ADMIN
-    if (parsed.data.includeInactive) {
-      const user = request.user as { role?: string } | undefined;
-      if (user?.role !== 'ADMIN') {
-        return reply.status(403).send({ message: 'Forbidden' });
-      }
-    }
-
+    // includeInactive: LISTAR inactivos es solo lectura y cualquier rol
+    // autenticado puede usarlo. Desactivar/reactivar sigue reservado a ADMIN.
     try {
       const products = await this.listProductsUseCase.execute(parsed.data);
       return reply.send(products);

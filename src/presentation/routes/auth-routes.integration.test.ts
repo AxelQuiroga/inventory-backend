@@ -110,12 +110,32 @@ describe('Autorización HTTP (end-to-end por Fastify, sin mocks de authorize)', 
     expect(res.statusCode).toBe(403);
   });
 
-  it('403: VIEWER no puede usar includeInactive=true', async () => {
-    const user = await createUser(UserRole.VIEWER);
-    const res = await inject('GET', '/products?includeInactive=true', {
-      token: tokenFor(user.id, 'VIEWER'),
+  it('200: VIEWER puede LISTAR inactivos con includeInactive=true (solo lectura)', async () => {
+    const admin = await createUser(UserRole.ADMIN);
+    const viewer = await createUser(UserRole.VIEWER);
+    const product = await createProduct();
+
+    // El admin lo desactiva; el viewer SOLO puede verlo, no gestionarlo.
+    // app.inject directo (sin content-type): el helper local manda siempre
+    // application/json y Fastify rechaza un POST sin body con 400.
+    const off = await app.inject({
+      method: 'POST',
+      url: `/products/${product.id}/deactivate`,
+      headers: { authorization: `Bearer ${tokenFor(admin.id, 'ADMIN')}` },
     });
-    expect(res.statusCode).toBe(403);
+    expect(off.statusCode).toBe(200);
+
+    const res = await inject('GET', '/products?includeInactive=true', {
+      token: tokenFor(viewer.id, 'VIEWER'),
+    });
+    expect(res.statusCode).toBe(200);
+    const ids = JSON.parse(res.body).data.map((p: { id: string }) => p.id);
+    expect(ids).toContain(product.id);
+
+    // Sin el filtro, el listado por defecto lo sigue ocultando.
+    const plain = await inject('GET', '/products', { token: tokenFor(viewer.id, 'VIEWER') });
+    const plainIds = JSON.parse(plain.body).data.map((p: { id: string }) => p.id);
+    expect(plainIds).not.toContain(product.id);
   });
 
   it('201: OPERATOR registra una salida válida y el stock baja', async () => {

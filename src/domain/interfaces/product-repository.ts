@@ -7,7 +7,7 @@ export interface ProductFilters {
   minPrice?: number;      // Precio mínimo
   maxPrice?: number;      // Precio máximo
   lowStock?: boolean;     // Stock <= minStock
-  includeInactive?: boolean; // Solo ADMIN: incluye productos desactivados
+  includeInactive?: boolean; // Cualquier rol autenticado: incluye desactivados
   sortBy?: 'name' | 'price' | 'stock' | 'createdAt';
   order?: 'asc' | 'desc';
   page?: number;
