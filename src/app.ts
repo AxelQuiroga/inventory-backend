@@ -15,7 +15,14 @@ import { userRoutes } from './presentation/routes/user-routes';
 // El env se valida ACÁ (no al importar): los tests setean process.env a mano
 // antes de llamar buildApp(). Acepta un Env inyectado para los casos que
 // quieran config puntual sin tocar process.env.
-export function buildApp(env: Env = loadEnv()) {
+//
+// deps.checkDb se inyecta desde el bootstrap (index.ts) para que /health pueda
+// distinguir "el proceso vive" de "el servicio sirve": si NO se pasa, /health es
+// un liveness puro (comportamiento de los tests, que no levantan la DB real).
+export function buildApp(
+  env: Env = loadEnv(),
+  deps: { checkDb?: () => Promise<void> } = {},
+) {
   const app = Fastify({
     logger: false,
   });
@@ -49,8 +56,25 @@ export function buildApp(env: Env = loadEnv()) {
   app.register(saleRoutes);
   app.register(userRoutes);
 
-  app.get('/health', async () => {
-    return { status: 'ok', timestamp: new Date().toISOString() };
+  app.get('/health', async (_req, reply) => {
+    // Con checkDb inyectado (solo el bootstrap lo hace), el probe incluye la
+    // base: una DB caída/expirada (el plan free de Render expira a los ~30
+    // días) devuelve 503 en vez de un "ok" que miente — el healthCheckPath de
+    // Render usa este status para marcar el servicio como unhealthy.
+    if (!deps.checkDb) {
+      return { status: 'ok', timestamp: new Date().toISOString() };
+    }
+
+    try {
+      await deps.checkDb();
+      return { status: 'ok', timestamp: new Date().toISOString() };
+    } catch {
+      return reply.code(503).send({
+        status: 'degraded',
+        db: 'unreachable',
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
 
   return app;
