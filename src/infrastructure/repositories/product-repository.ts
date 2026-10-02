@@ -91,9 +91,9 @@ export class DrizzleProductRepository implements ProductRepository {
   async findAll(filters?: ProductFilters): Promise<Paginated<Product>> {
     const conditions = this.buildConditions(filters);
 
-    // Por defecto solo productos activos (soft delete). Solo el flag
-    // includeInactive (restringido a ADMIN en la capa de presentación)
-    // expone los desactivados.
+    // Por defecto solo productos activos (soft delete). El flag
+    // includeInactive (disponible para cualquier rol autenticado) expone
+    // también los desactivados; desactivar/reactivar sigue siendo ADMIN.
     if (!filters?.includeInactive) {
       conditions.push(eq(products.active, true));
     }

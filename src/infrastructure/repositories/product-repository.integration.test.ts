@@ -145,7 +145,7 @@ describe('DrizzleProductRepository (integración real con PostgreSQL)', () => {
     const list = await repo.findAll();
     expect(list.data.find((p) => p.id === product.id)).toBeUndefined();
 
-    // includeInactive (ADMIN) lo incluye
+    // includeInactive lo incluye (el gate por rol vive en la capa HTTP)
     const adminList = await repo.findAll({ includeInactive: true });
     expect(adminList.data.find((p) => p.id === product.id)).toBeDefined();
 
