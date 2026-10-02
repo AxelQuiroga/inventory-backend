@@ -9,6 +9,18 @@ import { getTestDatabaseUrl } from './test-db-url';
 // apuntando a inventory_system_test.
 process.env.DATABASE_URL = getTestDatabaseUrl();
 
+// El browser e2e navega vite desde http://127.0.0.1:4310 y fetchea el backend
+// real (3210): es CROSS-ORIGIN, así que la allowlist debe incluirlo SIEMPRE,
+// cualquiera sea el .env local (que puede traer CORS_ORIGINS de producción y
+// romper los e2e con "No se pudo conectar con el servidor"). Mismo espíritu
+// que el fallback de JWT_SECRET de abajo: los e2e son autocontenidos.
+process.env.CORS_ORIGINS = [
+  'http://127.0.0.1:4310',
+  'http://localhost:4310',
+  'http://127.0.0.1:5173',
+  'http://localhost:5173',
+].join(',');
+
 // Los e2e hacen MUCHOS logins legítimos desde la misma IP de Vitest: el rate
 // limit encriptado a 10/15min los rompería. El comportamiento del limitador
 // se cubre con un integration test dedicado (límite bajo explícito).
