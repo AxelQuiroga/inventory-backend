@@ -4,18 +4,32 @@
 #   1) Conectar el repo `inventory-backend` en Render y elegir este archivo.
 #   2) En el dashboard del servicio, definir a mano (sync: false):
 #        - JWT_SECRET: secreto de firma, MINIMO 32 chars.
-#        - CORS_ORIGINS: allowlist de orígenes, p. ej. la URL pública del
-#          frontend en Render (https://inventory-frontend.onrender.com).
-#   3) Seed demo (idempotente) al boot: SEED=true crea admin@inventory.com / admin123.
-#      Se puede bajar a false en producción.
+#   3) SEED: ver el bloque comentado junto a la variable, abajo.
+#
+# CORS: no se declara acá a propósito. El modelo de deploy es SAME-ORIGIN: el
+# frontend corre nginx, templa ${API_UPSTREAM} y la SPA pega a /api de su propio
+# host, así que el browser nunca hace una request cross-origin al backend y no
+# valida CORS (esa validación es cross-origin). Qué más: el default del schema
+# (src/config/env.ts) es una allowlist SOLO de localhost de desarrollo
+# (localhost:5173/4310), inofensiva en un deploy público —ningún navegador
+# matchea esos origins contra un host real— y sin cargar la variable no se
+# declara ningún origin de producción. Sólo haría falta CORS_ORIGINS si alguien
+# serve la SPA con VITE_API_URL apuntando a la URL ABSOLUTA del backend; en ese
+# caso se define a mano en el dashboard (nunca acá, para no versionar el valor).
 #
 # El Dockerfile ya hace migraciones SIEMPRE antes de servir y corre como non-root.
+#
+# OJO: la base de datos del plan free de Render expira a los ~30 días sin
+# actividad; un servicio dormido puede quedar sin DB al despertar (error de
+# conexion hasta recrear el database). /health incluye un SELECT 1 real
+# (deps.checkDb en bootstrap), así que en ese caso devuelve 503 en vez de "ok".
 services:
   - type: web
     name: inventory-backend
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
+    healthCheckPath: /health
     envVars:
       # Connection string de la base propia de este blueprint (abajo).
       - key: DATABASE_URL
@@ -26,10 +40,18 @@ services:
       # versionan SOLO las claves, nunca los valores).
       - key: JWT_SECRET
         sync: false
-      - key: CORS_ORIGINS
-        sync: false
+      # SEED: el valor de abajo es "false" y es lo correcto para un deploy
+      # público, PERO implica un backend con CERO usuarios: el seed es la única
+      # forma de crear el primer admin.
+      #   - Primer deploy: poné SEED=true (una vez), creás admin@inventory.com
+      #     con las credenciales del README, y al toque seguís con SEED=false.
+      #   - Con SEED=false desde el arranque no podés loguearte hasta correr el
+      #     seed a mano (docker compose / npm run seed local).
+      #   - Dejar SEED=true en una URL pública expone credenciales por defecto
+      #     (admin@inventory.com / admin123) a cualquiera que adivine el email.
+      #     Después del primer arranque: cambiá la password del admin.
       - key: SEED
-        value: "true"
+        value: "false"
 
 databases:
   - name: inventory-db

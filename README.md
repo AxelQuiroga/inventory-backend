@@ -253,7 +253,8 @@ El archivo `.env` debe permanecer fuera del control de versiones.
 * [X] Endurecer seguridad (env Zod, JWT único, login timing-safe, bcrypt 12, rate limit, CORS allowlist).
 * [X] Dockerizar aplicación.
 * [X] Configurar CI/CD.
-* [ ] Deploy de producción.
+* [X] Blueprint de deploy listo (`render.yaml` del backend + proxy estructural en el frontend — el deploy real queda a criterio del operador).
+* [ ] Deploy ejecutado y verificado (levantar el servicio en Render y comprobar /health contra la DB real).
 * [ ] Documentar API.
 * [X] Frontend (React).
 
