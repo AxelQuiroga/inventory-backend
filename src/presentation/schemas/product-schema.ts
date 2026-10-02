@@ -2,7 +2,10 @@ import { z } from 'zod';
 
 export const createProductSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  description: z.string().optional().default(''),
+  // Tope duro: sin constraints, Zod nunca emite issue para `description` y el
+  // error del campo (frontend ProductFormPage) queda como cable muerto. El
+  // .max() es lo que hace REAL la validación y acota el storage.
+  description: z.string().max(500, 'Description must be 500 characters or less').optional().default(''),
   sku: z.string().min(1, 'SKU is required'),
   category: z.string().min(1, 'Category is required'),
   price: z.number().positive('Price must be positive'),
@@ -17,7 +20,9 @@ export const createProductSchema = z.object({
 
 export const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
-  description: z.string().optional(),
+  // Mismo tope que en create (ver createProductSchema): el update también puede
+  // devolver fieldErrors.description y el frontend los muestra bajo el textarea.
+  description: z.string().max(500, 'Description must be 500 characters or less').optional(),
   sku: z.string().min(1).optional(),
   category: z.string().min(1).optional(),
   price: z.number().positive().optional(),
