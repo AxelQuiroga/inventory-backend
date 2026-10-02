@@ -8,6 +8,9 @@ vi.mock('../../infrastructure/database', async () => {
 process.env.JWT_SECRET = 'cors-test-secret-0123456789abcdef';
 process.env.DATABASE_URL = 'postgresql://fake:fake@localhost:5432/fake';
 process.env.RATE_LIMIT_ENABLED = 'false';
+// La allowlist de CORS se fija ACÁ (no depende del .env del desarrollador):
+// vitest inyecta el .env local y CORS_ORIGINS definida ahí pisaría este test.
+process.env.CORS_ORIGINS = 'http://localhost:5173';
 
 import { buildApp } from '../../app';
 import { closeTestDb } from '../../infrastructure/database/test-db';

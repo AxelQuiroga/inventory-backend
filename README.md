@@ -207,14 +207,21 @@ Variables relevantes: `DATABASE_URL`, `JWT_SECRET` (mínimo 32 caracteres),
 El CI (`.github/workflows/ci.yml`) corre unit + integración + e2e de API sobre
 PostgreSQL real en cada push a `main`.
 
-### 🌱 Acceso demo (seed)
+### 🌱 Cuentas del seed
 
-Al bootear con `SEED=true` (o `npm run db:seed` localmente) se crea el admin
-inicial: **admin@inventory.com / admin123**.
+Al bootear con `SEED=true` (o `npm run db:seed` localmente) el seed:
 
-Es una credencial de **DEMO** para desarrollo. En producción se reemplaza por
-creación manual o variables de entorno; no usar ese password fuera de un
-entorno local.
+1. **Admin**: crea `admin@inventory.com` con la password de la variable
+   `SEED_ADMIN_PASSWORD` (**obligatoria**, mínimo 8 caracteres — el seed FALLA
+   si no está definida). Si el admin ya existe, **rota su password** a la de la
+   variable: para cambiar la password del admin en producción, setear
+   `SEED_ADMIN_PASSWORD` nueva, deployar con `SEED=true` y volver a
+   `SEED=false`. NUNCA hay una password por defecto documentada.
+2. **Demo público** (solo lectura): `demo@inventory.com` / `demo1234` — rol
+   `VIEWER` (no puede crear productos, registrar movimientos ni gestionar
+   usuarios). Es la cuenta de vitrina para portfolios/demos; por eso su password
+   SÍ es pública y documentada. El seed usa `ON CONFLICT DO NOTHING`: si ya
+   existe, no la pisa.
 
 ## 🔐 Variables de entorno
 

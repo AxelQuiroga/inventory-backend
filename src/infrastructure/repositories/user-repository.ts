@@ -58,6 +58,16 @@ export class DrizzleUserRepository implements UserRepository {
     return updated ? this.toDomain(updated) : null;
   }
 
+  async updatePassword(id: string, password: string): Promise<User | null> {
+    const [updated] = await db
+      .update(users)
+      .set({ password, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+
+    return updated ? this.toDomain(updated) : null;
+  }
+
   private toDomain(row: typeof users.$inferSelect): User {
     return {
       id: row.id,

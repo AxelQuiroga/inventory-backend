@@ -23,7 +23,7 @@ RUN npm run typecheck
 # migraciones, seed opcional); runtime SIN node_modules.
 RUN npx esbuild src/index.ts --bundle --platform=node --target=node24 --format=cjs --outfile=out/server.cjs \
  && npx esbuild src/infrastructure/database/migrate.ts --bundle --platform=node --target=node24 --format=cjs --outfile=out/migrate.cjs \
- && npx esbuild src/infrastructure/database/seed.ts --bundle --platform=node --target=node24 --format=cjs --outfile=out/seed.cjs
+ && npx esbuild src/infrastructure/database/seed-cli.ts --bundle --platform=node --target=node24 --format=cjs --outfile=out/seed.cjs
 
 # ---- Stage 2: runtime (sin devDeps, sin fuente, non-root) ----
 FROM node:24-alpine
@@ -43,7 +43,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/health >/dev/null || exit 1
 
-# 1) Migraciones SIEMPRE antes de servir. 2) Seed solo si SEED=true: es
-# destructivo nunca (ON CONFLICT DO NOTHING), repetible y crea el usuario
-# demo admin@inventory.com / admin123.
+# 1) Migraciones SIEMPRE antes de servir. 2) Seed solo si SEED=true: crea al
+# admin con SEED_ADMIN_PASSWORD (obligatoria; FALLA sin ella) y al demo público
+# demo@inventory.com/demo1234 (VIEWER). Repetible y no destructivo.
 ENTRYPOINT ["sh", "-c", "node out/migrate.cjs && if [ \"$SEED\" = \"true\" ]; then node out/seed.cjs; fi && exec node out/server.cjs"]

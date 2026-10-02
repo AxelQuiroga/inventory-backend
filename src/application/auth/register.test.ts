@@ -32,6 +32,7 @@ const userRepository: UserRepository = {
   findByEmail: vi.fn(),
   findAll: vi.fn(),
   updateActive: vi.fn(),
+  updatePassword: vi.fn(),
 };
 
 const useCase = new Register(userRepository);

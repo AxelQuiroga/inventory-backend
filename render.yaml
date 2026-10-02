@@ -43,15 +43,22 @@ services:
       # SEED: el valor de abajo es "false" y es lo correcto para un deploy
       # público, PERO implica un backend con CERO usuarios: el seed es la única
       # forma de crear el primer admin.
-      #   - Primer deploy: poné SEED=true (una vez), creás admin@inventory.com
-      #     con las credenciales del README, y al toque seguís con SEED=false.
+      #   - Primer deploy: poné SEED=true (una vez) y definí SEED_ADMIN_PASSWORD
+      #     (obligatoria, min 8 chars). El seed crea al admin con ESA password y
+      #     al demo público demo@inventory.com / demo1234 (VIEWER, vitrina).
+      #   - Rotar la password del admin: SEED_ADMIN_PASSWORD nueva + SEED=true
+      #     + redeploy. Después volvé a SEED=false.
+      #   - Dejar SEED=true en una URL pública NO es un riesgo de credenciales
+      #     (el admin nunca tiene password por defecto), pero cada deploy
+      #     re-escribiría la password del admin a la del env: apagalo igual.
       #   - Con SEED=false desde el arranque no podés loguearte hasta correr el
       #     seed a mano (docker compose / npm run seed local).
-      #   - Dejar SEED=true en una URL pública expone credenciales por defecto
-      #     (admin@inventory.com / admin123) a cualquiera que adivine el email.
-      #     Después del primer arranque: cambiá la password del admin.
       - key: SEED
         value: "false"
+      # Password del admin, definida por el operador (min 8 chars). Sin esta
+      # variable el seed FALLA en vez de crear credenciales por defecto.
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
 
 databases:
   - name: inventory-db

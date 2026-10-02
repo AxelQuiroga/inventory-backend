@@ -37,3 +37,15 @@ export class EmailAlreadyRegisteredError extends DomainError {
     super('EMAIL_ALREADY_REGISTERED', 'Email already registered');
   }
 }
+
+// Cambio de password con currentPassword que no coincide con el hash real:
+// 401 en el endpoint, igual que un login fallido. Tipo PROPIO a propósito —
+// no reutilizar InvalidCredentialsError acá, porque ese contrato está atado a
+// /auth/login y su mensaje genérico "Invalid credentials" confundiría a un
+// usuario legítimo que escribió mal su password actual (quiere saber cuál de
+// los dos campos está mal).
+export class CurrentPasswordMismatchError extends DomainError {
+  constructor() {
+    super('CURRENT_PASSWORD_MISMATCH', 'Current password is incorrect');
+  }
+}

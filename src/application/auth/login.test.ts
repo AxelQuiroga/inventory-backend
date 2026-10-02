@@ -22,6 +22,7 @@ const userRepository: UserRepository = {
   findByEmail: vi.fn(),
   findAll: vi.fn(),
   updateActive: vi.fn(),
+  updatePassword: vi.fn(),
 };
 
 const jwtService = new JwtService('test-secret');
