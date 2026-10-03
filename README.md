@@ -223,6 +223,17 @@ Al bootear con `SEED=true` (o `npm run db:seed` localmente) el seed:
    SÍ es pública y documentada. El seed usa `ON CONFLICT DO NOTHING`: si ya
    existe, no la pisa.
 
+### 👥 Roles
+
+El sistema distingue tres roles y **solo la cuenta demo es pública**; los otros
+dos requieren autenticación y permisos propios:
+
+| Rol | Alcance |
+| --- | --- |
+| **VIEWER** ("Lector") | Solo lectura: consulta productos, movimientos y ventas. Es el rol de la demo pública (`demo@inventory.com`). |
+| **OPERATOR** | Registra entradas/salidas de stock y ventas. No gestiona productos ni usuarios. |
+| **ADMIN** | Gestión completa: productos (alta/edición/desactivación), usuarios y configuración. Su password se gobierna con `SEED_ADMIN_PASSWORD` (nunca pública). |
+
 ## 🔐 Variables de entorno
 
 Las credenciales y configuraciones sensibles no deben almacenarse en el repositorio.
