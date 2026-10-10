@@ -23,7 +23,7 @@ describe('authorize', () => {
   })
 
   it('returns 403 when the request has no authenticated user', async () => {
-    const request = {} as FastifyRequest
+    const request = {} as unknown as FastifyRequest
 
     await authorize('ADMIN')(request, reply)
 
