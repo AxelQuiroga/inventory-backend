@@ -26,6 +26,27 @@ beforeEach(async () => {
   creds = await resetE2eDb();
 });
 
+describe('PUBLIC API E2E', () => {
+  it('GET / devuelve información básica sin autenticación', async () => {
+    const res = await app.inject({ method: 'GET', url: '/' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('application/json');
+    expect(JSON.parse(res.body)).toEqual({
+      name: 'Inventory Backend API',
+      description: 'API REST para gestión de inventario',
+      endpoints: {
+        health: '/health',
+        login: '/auth/login',
+        products: '/products',
+        movements: '/movements',
+        sales: '/sales',
+        users: '/users',
+      },
+    });
+  });
+});
+
 describe('AUTH E2E', () => {
   it('login exitoso devuelve un token JWT', async () => {
     const res = await app.inject({
