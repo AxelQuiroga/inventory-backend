@@ -167,6 +167,18 @@ Por defecto, la API estará disponible en:
 http://localhost:3000
 ```
 
+## 🌐 Endpoints de entrada
+
+La raíz `GET /` devuelve información básica de la API y las rutas principales; no requiere autenticación ni consulta la base de datos. El estado operativo y la conectividad con PostgreSQL se verifican por separado mediante `GET /health`.
+
+| Método | Ruta | Propósito |
+| --- | --- | --- |
+| GET | `/` | Información básica de la API |
+| GET | `/health` | Estado del servicio y, en el servidor, comprobación de la base de datos |
+| POST | `/auth/login` | Inicio de sesión |
+
+Los endpoints de negocio, como `/products`, `/movements`, `/sales` y `/users`, pueden requerir JWT según la ruta.
+
 ## 🧪 Testing
 
 Los tests se ejecutarán mediante:
@@ -213,8 +225,8 @@ Al bootear con `SEED=true` (o `npm run db:seed` localmente) el seed:
 
 1. **Admin**: crea `admin@inventory.com` con la password de la variable
    `SEED_ADMIN_PASSWORD` (**obligatoria**, mínimo 8 caracteres — el seed FALLA
-   si no está definida). Si el admin ya existe, **rota su password** a la de la
-   variable: para cambiar la password del admin en producción, setear
+   si no está definida). Si el admin ya existe, **rota su password** a la de
+   la variable: para cambiar la password del admin en producción, setear
    `SEED_ADMIN_PASSWORD` nueva, deployar con `SEED=true` y volver a
    `SEED=false`. NUNCA hay una password por defecto documentada.
 2. **Demo público** (solo lectura): `demo@inventory.com` / `demo1234` — rol
