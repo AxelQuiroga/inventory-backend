@@ -56,6 +56,21 @@ export function buildApp(
   app.register(saleRoutes);
   app.register(userRoutes);
 
+  // Raíz pública e informativa: no consulta la DB ni sustituye /health.
+  // Los endpoints de negocio pueden requerir JWT según sus propias rutas.
+  app.get('/', async () => ({
+    name: 'Inventory Backend API',
+    description: 'API REST para gestión de inventario',
+    endpoints: {
+      health: '/health',
+      login: '/auth/login',
+      products: '/products',
+      movements: '/movements',
+      sales: '/sales',
+      users: '/users',
+    },
+  }));
+
   app.get('/health', async (_req, reply) => {
     // Con checkDb inyectado (solo el bootstrap lo hace), el probe incluye la
     // base: una DB caída/expirada (el plan free de Render expira a los ~30
